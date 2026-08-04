@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mapa Coroplético INMAT - Calidad IV</title>
+  <title>Mapa Web INMAT y Centros de Salud</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
@@ -94,6 +94,23 @@
       background-color: #f7fafc;
       color: #2d3748;
     }
+
+    /* Estilos del popup de Centros de Salud */
+    .health-popup-title {
+      font-weight: bold;
+      font-size: 14px;
+      color: #2b6cb0;
+      margin-bottom: 6px;
+      border-bottom: 2px solid #3182ce;
+      padding-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .health-popup-detail {
+      font-size: 12px;
+      color: #2d3748;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -111,8 +128,11 @@
       attribution: '&copy; OpenStreetMap &copy; CARTO'
     }).addTo(map);
 
-    // 3. Función de color según cortes y paleta Spectral
-    function getColor(d) {
+    // ==========================================
+    // SECCIÓN 1: CAPA DE RADIOS CENSALES (INMAT)
+    // ==========================================
+
+    function getColorINMAT(d) {
       return d > 33.3 ? '#d7191c' :  // Rojo
              d > 11.5 ? '#fdae61' :  // Naranja
              d > 4.4  ? '#ffffbf' :  // Amarillo
@@ -120,28 +140,24 @@
                         '#2b83ba';   // Azul
     }
 
-    // 4. Estilo gráfico de los polígonos (Sin borde)
-    function style(feature) {
+    function styleINMAT(feature) {
       const valor = feature.properties.pc_Cal_IV || 0;
       return {
-        fillColor: getColor(valor),
-        stroke: false,       // Sin contorno
+        fillColor: getColorINMAT(valor),
+        stroke: false,
         fillOpacity: 0.85
       };
     }
 
-    // Función auxiliar para formatear porcentajes
     function fmt(val) {
       if (val === undefined || val === null || isNaN(val)) return 'S/D';
       return Number(val).toFixed(2) + '%';
     }
 
-    // 5. Ventana emergente (Popup) con Partido (DPTO) y Radio (REDCODE)
-    function onEachFeature(feature, layer) {
+    function onEachFeatureINMAT(feature, layer) {
       if (feature.properties) {
         const p = feature.properties;
 
-        // Recuperación directa de Partido y Código usando REDCODE y DPTO
         const partido = p.DPTO || p.dpto || p.Dpto || 'Sin Municipio';
         const codigo = p.REDCODE || p.redcode || p.Redcode || 'S/D';
 
@@ -149,7 +165,10 @@
         const cal2 = fmt(p.pc_Cal_II);
         const cal3 = fmt(p.pc_Cal_III);
         const cal4 = fmt(p.pc_Cal_IV);
-        const ign  = fmt(p.pc_Ignorado || p.pc_ignorado);
+
+        // Búsqueda flexible para pc_ignorado
+        const valIgnorado = p.pc_Ignorado ?? p.pc_ignorado ?? p.pc_Ignora ?? p.pc_ignora ?? p.PC_IGNORADO ?? p.pc_IGNORADO ?? p.Ignorado ?? p.ignorado;
+        const ign = fmt(valIgnorado);
 
         const popupContent = `
           <div style="font-family: Arial, sans-serif; min-width: 220px;">
@@ -188,27 +207,113 @@
       }
     }
 
-    // 6. Carga del GeoJSON desde GitHub
-    const urlGeoJSON = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
+    // ==========================================
+    // SECCIÓN 2: CAPA DE ESTABLECIMIENTOS DE SALUD
+    // ==========================================
 
-    fetch(urlGeoJSON)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('No se pudo obtener el archivo GeoJSON');
-        }
-        return response.json();
-      })
+    // Color del punto según Origen de Financiamiento
+    function getSaludColor(origen) {
+      if (!origen) return '#718096';
+      const text = origen.toString().toLowerCase();
+
+      if (text.includes('público') || text.includes('publico') || text.includes('estatal')) return '#2b6cb0'; // Azul
+      if (text.includes('privado')) return '#e53e3e'; // Rojo
+      if (text.includes('obra social') || text.includes('obras sociales')) return '#dd6b20'; // Naranja
+      if (text.includes('mixto') || text.includes('cooperativa')) return '#805ad5'; // Morado
+      return '#319795'; // Teal / Verde agua para otros
+    }
+
+    function pointToLayerSalud(feature, latlng) {
+      const origen = feature.properties.origen_financiamiento;
+      return L.circleMarker(latlng, {
+        radius: 6,
+        fillColor: getSaludColor(origen),
+        color: '#ffffff',
+        weight: 1.5,
+        opacity: 1,
+        fillOpacity: 0.9
+      });
+    }
+
+    function onEachFeatureSalud(feature, layer) {
+      if (feature.properties) {
+        const p = feature.properties;
+
+        const nombre = p.establecimiento_nombre || p.nombre || 'Establecimiento de Salud';
+        const partido = p.departamento_nombre || p.departamento || p.partido || 'S/D';
+        const localidad = p.localidad_nombre || p.localidad || 'S/D';
+        const tipologia = p.tipologia_nombre || p.tipologia || 'S/D';
+        const financiamiento = p.origen_financiamiento || 'S/D';
+
+        const popupContent = `
+          <div style="font-family: Arial, sans-serif; min-width: 230px;">
+            <div class="health-popup-title">
+              🏥 ${nombre}
+            </div>
+            <div class="health-popup-detail">
+              <strong>Partido:</strong> ${partido}
+            </div>
+            <div class="health-popup-detail">
+              <strong>Localidad:</strong> ${localidad}
+            </div>
+            <div class="health-popup-detail">
+              <strong>Tipo:</strong> ${tipologia}
+            </div>
+            <div class="health-popup-detail" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+              <strong>Financiamiento:</strong> <span style="color: ${getSaludColor(financiamiento)}; font-weight: bold;">${financiamiento}</span>
+            </div>
+          </div>
+        `;
+
+        layer.bindPopup(popupContent);
+      }
+    }
+
+    // ==========================================
+    // SECCIÓN 3: CARGA DE CAPAS GEOJSON Y CONTROL
+    // ==========================================
+
+    const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
+    const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_fil.geojson';
+
+    // Declaración de capas
+    let inmatLayer, saludLayer;
+
+    // Cargar INMAT
+    fetch(urlINMAT)
+      .then(res => res.json())
       .then(data => {
-        const geojsonLayer = L.geoJSON(data, {
-          style: style,
-          onEachFeature: onEachFeature
+        inmatLayer = L.geoJSON(data, {
+          style: styleINMAT,
+          onEachFeature: onEachFeatureINMAT
         }).addTo(map);
 
-        map.fitBounds(geojsonLayer.getBounds());
-      })
-      .catch(error => console.error('Error al cargar el GeoJSON:', error));
+        map.fitBounds(inmatLayer.getBounds());
 
-    // 7. Leyenda completa
+        // Cargar Centros de Salud después de INMAT
+        return fetch(urlSalud);
+      })
+      .then(res => res.json())
+      .then(data => {
+        saludLayer = L.geoJSON(data, {
+          pointToLayer: pointToLayerSalud,
+          onEachFeature: onEachFeatureSalud
+        }).addTo(map);
+
+        // Agregar selector de capas en la esquina superior derecha
+        const overlays = {
+          " Radios Censales (INMAT IV)": inmatLayer,
+          "🏥 Establecimientos de Salud": saludLayer
+        };
+
+        L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+      })
+      .catch(error => console.error('Error al cargar capas:', error));
+
+    // ==========================================
+    // SECCIÓN 4: LEYENDA INMAT
+    // ==========================================
+
     const legend = L.control({ position: 'bottomright' });
 
     legend.onAdd = function () {
@@ -223,7 +328,7 @@
         const to = breaks[i + 1];
 
         html +=
-          '<i style="background:' + getColor(from + 0.01) + '"></i> ' +
+          '<i style="background:' + getColorINMAT(from + 0.01) + '"></i> ' +
           from + '%' + ' &ndash; ' + to + '%<br>';
       }
       html += `</div>`;
