@@ -120,29 +120,30 @@
                         '#2b83ba';   // Azul
     }
 
-    // 4. Estilo gráfico de los polígonos (SIN BORDE / Transparente)
+    // 4. Estilo gráfico de los polígonos (Sin borde)
     function style(feature) {
       const valor = feature.properties.pc_Cal_IV || 0;
       return {
         fillColor: getColor(valor),
-        stroke: false,       // Quita el borde por completo
-        fillOpacity: 0.85    // Ligera opacidad para apreciar la capa base
+        stroke: false,       // Sin contorno
+        fillOpacity: 0.85
       };
     }
 
-    // Función auxiliar para formatear valores numéricos a porcentaje
+    // Función auxiliar para formatear porcentajes
     function fmt(val) {
       if (val === undefined || val === null || isNaN(val)) return 'S/D';
       return Number(val).toFixed(2) + '%';
     }
 
-    // 5. Configuración de ventanas emergentes (Popups) completas
+    // 5. Ventana emergente (Popup) con Partido (DPTO) y Radio (REDCODE)
     function onEachFeature(feature, layer) {
       if (feature.properties) {
         const p = feature.properties;
 
-        // Búsqueda flexible del código del radio censal
-        const codigo = p.Código || p.Codigo || p.CODIGO || p.codigo || p.Code || p.ID || p.LINK || p.radio || 'S/D';
+        // Recuperación directa de Partido y Código usando REDCODE y DPTO
+        const partido = p.DPTO || p.dpto || p.Dpto || 'Sin Municipio';
+        const codigo = p.REDCODE || p.redcode || p.Redcode || 'S/D';
 
         const cal1 = fmt(p.pc_Cal_I);
         const cal2 = fmt(p.pc_Cal_II);
@@ -151,8 +152,11 @@
         const ign  = fmt(p.pc_Ignorado || p.pc_ignorado);
 
         const popupContent = `
-          <div style="font-family: Arial, sans-serif; min-width: 210px;">
-            <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 2px;">
+          <div style="font-family: Arial, sans-serif; min-width: 220px;">
+            <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">
+              Partido: ${partido}
+            </div>
+            <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
               Radio Censal: ${codigo}
             </div>
             <table class="popup-table">
@@ -184,7 +188,7 @@
       }
     }
 
-    // 6. Carga del GeoJSON desde el repositorio GitHub
+    // 6. Carga del GeoJSON desde GitHub
     const urlGeoJSON = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
 
     fetch(urlGeoJSON)
@@ -200,7 +204,6 @@
           onEachFeature: onEachFeature
         }).addTo(map);
 
-        // Ajustar vista automáticamente a los límites de la capa
         map.fitBounds(geojsonLayer.getBounds());
       })
       .catch(error => console.error('Error al cargar el GeoJSON:', error));
