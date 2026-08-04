@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa Coroplético INMAT - pc_Cal_IV</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { width: 100vw; height: 100vh; }
+    
+    /* Estilos de la leyenda */
+    .info.legend {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px 14px;
+      line-height: 20px;
+      color: #333;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      border-radius: 6px;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+    }
+    .info.legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.85;
+      border: 0.5px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // 1. Inicializar el mapa
+    const map = L.map('map').setView([-34.6037, -58.3816], 10);
+
+    // 2. Capa base (CartoDB Positron - tono neutro claro ideal para coropletas)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    // 3. Función de color según cortes definidos y paleta Spectral
+    function getColor(d) {
+      return d > 33.3 ? '#d7191c' :  // Rojo
+             d > 11.5 ? '#fdae61' :  // Naranja
+             d > 4.4  ? '#ffffbf' :  // Amarillo
+             d > 1.5  ? '#abdda4' :  // Celeste/Verde claro
+                        '#2b83ba';   // Azul
+    }
+
+    // 4. Estilo gráfico de las geometrías
+    function style(feature) {
+      const valor = feature.properties.pc_Cal_IV || 0;
+      return {
+        fillColor: getColor(valor),
+        weight: 0.5,
+        opacity: 1,
+        color: '#ffffff',
+        fillOpacity: 0.8
+      };
+    }
+
+    // 5. Configuración de ventanas emergentes (Popups)
+    function onEachFeature(feature, layer) {
+      if (feature.properties) {
+        const codigo = feature.properties.Código || feature.properties.Codigo || 'S/D';
+        const val = feature.properties.pc_Cal_IV !== undefined 
+          ? Number(feature.properties.pc_Cal_IV).toFixed(2) + '%' 
+          : 'Sin datos';
+
+        layer.bindPopup(`
+          <div style="font-family: Arial, sans-serif;">
+            <strong>Código:</strong> ${codigo}<br/>
+            <strong>% Calidad IV:</strong> ${val}
+          </div>
+        `);
+      }
+    }
+
+    // 6. Carga del GeoJSON desde el repositorio GitHub
+    const urlGeoJSON = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
+
+    fetch(urlGeoJSON)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('No se pudo obtener el archivo GeoJSON');
+        }
+        return response.json();
+      })
+      .then(data => {
+        const geojsonLayer = L.geoJSON(data, {
+          style: style,
+          onEachFeature: onEachFeature
+        }).addTo(map);
+
+        // Zoom y centrado automático al área que abarcan los datos
+        map.fitBounds(geojsonLayer.getBounds());
+      })
+      .catch(error => console.error('Error al cargar GeoJSON:', error));
+
+    // 7. Leyenda dinámica adaptada a los cortes exactos
+    const legend = L.control({ position: 'bottomright' });
+    
+    legend.onAdd = function () {
+      const div = L.DomUtil.create('div', 'info legend');
+      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+      
+      div.innerHTML = '<strong>% Calidad IV (Spectral)</strong><br><br>';
+
+      for (let i = 0; i < breaks.length - 1; i++) {
+        const from = breaks[i];
+        const to = breaks[i + 1];
+
+        div.innerHTML +=
+          '<i style="background:' + getColor(from + 0.01) + '"></i> ' +
+          from + '%' + ' &ndash; ' + to + '%<br>';
+      }
+      return div;
+    };
+    
+    legend.addTo(map);
+  </script>
+</body>
+</html>
