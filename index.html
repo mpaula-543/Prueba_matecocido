@@ -119,10 +119,12 @@
     // 1. Inicializar el mapa
     const map = L.map('map').setView([-34.6037, -58.3816], 10);
 
-    // 2. Capa base (CartoDB Positron)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(map);
+    // 2. Capa base ARGENMAP
+    L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capasbase:argenmap_gris@EPSG%3A3857@png/{z}/{x}/{-\y}.png', {
+  attribution: '&copy; <a href="https://www.ign.gob.ar/">IGN Argentina</a>',
+  minZoom: 3,
+  maxZoom: 18
+}).addTo(map);
 
     // Formateador de porcentajes
     function fmt(val) {
@@ -135,12 +137,12 @@
     // ==========================================
 
     function getColorINMAT(d) {
-      return d > 33.3 ? '#d7191c' :  // Rojo
-             d > 11.5 ? '#fdae61' :  // Naranja
-             d > 4.4  ? '#ffffbf' :  // Amarillo
-             d > 1.5  ? '#abdda4' :  // Verde/Celeste
-                        '#2b83ba';   // Azul
-    }
+  return d > 33.3 ? '#4a148c' :  // Violeta muy oscuro / Púrpura intenso
+         d > 11.5 ? '#7b1fa2' :  // Violeta oscuro
+         d > 4.4  ? '#ab47bc' :  // Violeta medio
+         d > 1.5  ? '#ce93d8' :  // Violeta claro
+                    '#f3e5f5';   // Violeta muy suave / casi blanco
+}
 
     function styleINMAT(feature) {
       return {
@@ -187,19 +189,26 @@
     // Mapeo directo de colores según tus valores exactos
     function getSaludColor(origen) {
       switch (origen) {
-        case 'Estatal':        return '#2b6cb0'; // Azul
-        case 'Privado':        return '#e53e3e'; // Rojo
-        case 'Obras Sociales': return '#dd6b20'; // Naranja
+        case 'FFAA/Seguridad':        return '#a6cee3'; // Celeste
+        case 'Municipal':        return '#1f78b4'; // Azul
+        case 'Mutual':       return '#b2df8a'; // Verde claro
+        case 'Nacional':       return '#33a02c';  // Verde oscuro
+        case 'Privado':       return '#fb9a99'; //rosa
+        case 'Provincial':       return '#e31a1c'; // rojo
+        case 'Seguridad social':       return '#fdbf6f'; // Naranja claro
+        case 'Servicio Penitenciario Federal':         return '#ff7f00'; // Naranja
+        case 'Servicio Penitenciario Provincial':         return '#cab2d6'; // Lila  
+        case 'Universitario público':         return '#6a3d9a'; // Violeta 
         default:               return '#718096'; // Gris para nulos/otros
       }
     }
 
     function pointToLayerSalud(feature, latlng) {
       return L.circleMarker(latlng, {
-        radius: 5,
+        radius: 3,
         fillColor: getSaludColor(feature.properties.origen_financiamiento),
         color: '#ffffff',
-        weight: 1,
+        weight: 0.5,
         opacity: 1,
         fillOpacity: 0.9
       });
@@ -266,48 +275,62 @@
       .catch(err => console.error('Error cargando los GeoJSON:', err));
 
     // ==========================================
-    // SECCIÓN 4: LEYENDA PRINCIPAL
-    // ==========================================
+// SECCIÓN 4: LEYENDA PRINCIPAL
+// ==========================================
 
-    const legend = L.control({ position: 'bottomright' });
+const legend = L.control({ position: 'bottomright' });
 
-    legend.onAdd = function () {
-      const div = L.DomUtil.create('div', 'info legend');
-      
-      let html = `<div class="legend-title">Establecimientos de Salud</div>`;
-      html += `
-        <div class="legend-scale">
-          <i class="circle" style="background:#2b6cb0;"></i> Estatal<br>
-          <i class="circle" style="background:#e53e3e;"></i> Privado<br>
-          <i class="circle" style="background:#dd6b20;"></i> Obras Sociales<br>
-        </div>
-      `;
+legend.onAdd = function () {
+  const div = L.DomUtil.create('div', 'info legend');
 
-      html += `<div class="legend-title" style="margin-top:12px;">Hogares con INMAT IV (Precaria)</div>`;
-      html += `<div class="legend-scale">`;
-      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
-      for (let i = 0; i < breaks.length - 1; i++) {
-        html += `<i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%<br>`;
-      }
-      html += `</div>`;
+  // Mapeo de categorías de salud con sus colores exactos
+  const saludCategorias = [
+    { nombre: 'Municipal', color: '#1f78b4' },
+    { nombre: 'Provincial', color: '#e31a1c' },
+    { nombre: 'Nacional', color: '#33a02c' },
+    { nombre: 'Privado', color: '#fb9a99' },
+    { nombre: 'Seguridad social', color: '#fdbf6f' },
+    { nombre: 'Mutual', color: '#b2df8a' },
+    { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
+    { nombre: 'Servicio Penitenciario Federal', color: '#ff7f00' },
+    { nombre: 'Servicio Penitenciario Provincial', color: '#cab2d6' },
+    { nombre: 'Universitario público', color: '#6a3d9a' }
+  ];
 
-      html += `
-        <details class="legend-details">
-          <summary>Ver definiciones INMAT</summary>
-          <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
-          <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
-          <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
-          <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
-        </details>
-      `;
+  let html = `<div class="legend-title">Establecimientos de Salud</div>`;
+  html += `<div class="legend-scale">`;
 
-      html += `<div class="legend-source">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
+  // Generar cada ítem de salud dinámicamente
+  saludCategorias.forEach(cat => {
+    html += `<i class="circle" style="background:${cat.color};"></i> ${cat.nombre}<br>`;
+  });
 
-      div.innerHTML = html;
-      return div;
-    };
+  html += `</div>`;
 
-    legend.addTo(map);
-  </script>
-</body>
-</html>
+  // Leyenda para INMAT IV
+  html += `<div class="legend-title" style="margin-top:12px;">Hogares con INMAT IV (Precaria)</div>`;
+  html += `<div class="legend-scale">`;
+  const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+  for (let i = 0; i < breaks.length - 1; i++) {
+    html += `<i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%<br>`;
+  }
+  html += `</div>`;
+
+  // Detalles adicionales
+  html += `
+    <details class="legend-details">
+      <summary>Ver definiciones INMAT</summary>
+      <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
+      <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
+      <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
+      <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
+    </details>
+  `;
+
+  html += `<div class="legend-source">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
+
+  div.innerHTML = html;
+  return div;
+};
+
+legend.addTo(map);
