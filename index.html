@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mapa Coroplético INMAT - pc_Cal_IV</title>
+  <title>Mapa Coroplético INMAT - Calidad IV</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
@@ -11,24 +11,71 @@
     body { margin: 0; padding: 0; }
     #map { width: 100vw; height: 100vh; }
     
-    /* Estilos de la leyenda */
+    /* Estilos del recuadro de la leyenda y nota metodológica */
     .info.legend {
-      background: rgba(255, 255, 255, 0.9);
-      padding: 10px 14px;
-      line-height: 20px;
-      color: #333;
-      box-shadow: 0 0 15px rgba(0,0,0,0.2);
-      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px 16px;
+      color: #2c3e50;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
       font-family: Arial, sans-serif;
-      font-size: 13px;
+      font-size: 12px;
+      max-width: 320px;
+      line-height: 1.4;
     }
-    .info.legend i {
+
+    .legend-title {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: #1a252f;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+
+    .legend-scale {
+      margin-bottom: 10px;
+    }
+
+    .legend-scale i {
       width: 18px;
       height: 18px;
       float: left;
       margin-right: 8px;
       opacity: 0.85;
-      border: 0.5px solid #ccc;
+      border: 0.5px solid #bbb;
+      border-radius: 2px;
+    }
+
+    /* Sección desplegable con referencias metodológicas */
+    .legend-details {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #4a5568;
+      border-top: 1px dashed #ccc;
+      padding-top: 6px;
+    }
+
+    .legend-details summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: #2b6cb0;
+      outline: none;
+      margin-bottom: 4px;
+    }
+
+    .legend-details p {
+      margin: 4px 0;
+    }
+
+    /* Fuente / Aclaración al pie */
+    .legend-source {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #718096;
+      font-style: italic;
+      border-top: 1px solid #eee;
+      padding-top: 6px;
     }
   </style>
 </head>
@@ -42,21 +89,21 @@
     // 1. Inicializar el mapa
     const map = L.map('map').setView([-34.6037, -58.3816], 10);
 
-    // 2. Capa base (CartoDB Positron - tono neutro claro ideal para coropletas)
+    // 2. Capa base (CartoDB Positron)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO'
     }).addTo(map);
 
-    // 3. Función de color según cortes definidos y paleta Spectral
+    // 3. Función de color según cortes y paleta Spectral
     function getColor(d) {
       return d > 33.3 ? '#d7191c' :  // Rojo
              d > 11.5 ? '#fdae61' :  // Naranja
              d > 4.4  ? '#ffffbf' :  // Amarillo
-             d > 1.5  ? '#abdda4' :  // Celeste/Verde claro
+             d > 1.5  ? '#abdda4' :  // Verde/Celeste claro
                         '#2b83ba';   // Azul
     }
 
-    // 4. Estilo gráfico de las geometrías
+    // 4. Estilo gráfico de los polígonos
     function style(feature) {
       const valor = feature.properties.pc_Cal_IV || 0;
       return {
@@ -101,31 +148,55 @@
           onEachFeature: onEachFeature
         }).addTo(map);
 
-        // Zoom y centrado automático al área que abarcan los datos
+        // Ajustar vista automáticamente a los límites de la capa
         map.fitBounds(geojsonLayer.getBounds());
       })
-      .catch(error => console.error('Error al cargar GeoJSON:', error));
+      .catch(error => console.error('Error al cargar el GeoJSON:', error));
 
-    // 7. Leyenda dinámica adaptada a los cortes exactos
+    // 7. Leyenda completa con Título, Escala, Referencias INMAT y Fuente
     const legend = L.control({ position: 'bottomright' });
-    
+
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
       const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
-      
-      div.innerHTML = '<strong>% Calidad IV (Spectral)</strong><br><br>';
 
+      // Título
+      let html = `<div class="legend-title">Porcentaje de hogares con calidad 4 de los materiales de la vivienda (INMAT)</div>`;
+
+      // Escala cromática de rangos
+      html += `<div class="legend-scale">`;
       for (let i = 0; i < breaks.length - 1; i++) {
         const from = breaks[i];
         const to = breaks[i + 1];
 
-        div.innerHTML +=
+        html +=
           '<i style="background:' + getColor(from + 0.01) + '"></i> ' +
           from + '%' + ' &ndash; ' + to + '%<br>';
       }
+      html += `</div>`;
+
+      // Aclaraciones sobre la clasificación INMAT (Desplegable)
+      html += `
+        <details class="legend-details">
+          <summary>Ver definiciones INMAT (I a IV)</summary>
+          <p><strong>Calidad 1 (INMAT I):</strong> Materiales resistentes y de buena calidad en todos los componentes (pisos, paredes y techos).</p>
+          <p><strong>Calidad 2 (INMAT II):</strong> Materiales resistentes en general, pero con alguna carencia menor en revestimientos o aislación.</p>
+          <p><strong>Calidad 3 (INMAT III):</strong> Materiales poco resistentes o deficitarios en al menos uno de los elementos principales de la construcción.</p>
+          <p><strong>Calidad 4 (INMAT IV):</strong> Materiales no resistentes o precarios en la mayoría de los componentes de la estructura habitacional.</p>
+        </details>
+      `;
+
+      // Fuente y aclaración
+      html += `
+        <div class="legend-source">
+          Elaborado en base al Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC), procesado con REDATAM.
+        </div>
+      `;
+
+      div.innerHTML = html;
       return div;
     };
-    
+
     legend.addTo(map);
   </script>
 </body>
