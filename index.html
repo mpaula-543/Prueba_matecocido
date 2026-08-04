@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mapa Web INMAT y Centros de Salud</title>
+  <title>Visor Salud e INMAT - Conurbano</title>
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
@@ -11,7 +11,7 @@
     body { margin: 0; padding: 0; }
     #map { width: 100vw; height: 100vh; }
     
-    /* Estilos del recuadro de la leyenda */
+    /* Estilos del recuadro de las leyendas */
     .info.legend {
       background: rgba(255, 255, 255, 0.95);
       padding: 12px 16px;
@@ -22,6 +22,7 @@
       font-size: 12px;
       max-width: 320px;
       line-height: 1.4;
+      margin-bottom: 10px;
     }
 
     .legend-title {
@@ -34,17 +35,21 @@
     }
 
     .legend-scale {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .legend-scale i {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       float: left;
       margin-right: 8px;
-      opacity: 0.85;
+      opacity: 0.9;
       border: 0.5px solid #bbb;
       border-radius: 2px;
+    }
+
+    .legend-scale i.circle {
+      border-radius: 50%;
     }
 
     .legend-details {
@@ -63,9 +68,7 @@
       margin-bottom: 4px;
     }
 
-    .legend-details p {
-      margin: 4px 0;
-    }
+    .legend-details p { margin: 4px 0; }
 
     .legend-source {
       margin-top: 8px;
@@ -76,7 +79,7 @@
       padding-top: 6px;
     }
 
-    /* Estilos para la tabla del Popup */
+    /* Estilos para Popups */
     .popup-table {
       width: 100%;
       border-collapse: collapse;
@@ -84,18 +87,11 @@
       font-size: 12px;
     }
 
-    .popup-table th, .popup-table td {
+    .popup-table td {
       padding: 3px 6px;
-      text-align: left;
       border-bottom: 1px solid #eee;
     }
 
-    .popup-table th {
-      background-color: #f7fafc;
-      color: #2d3748;
-    }
-
-    /* Estilos del popup de Centros de Salud */
     .health-popup-title {
       font-weight: bold;
       font-size: 14px;
@@ -128,158 +124,121 @@
       attribution: '&copy; OpenStreetMap &copy; CARTO'
     }).addTo(map);
 
+    // Formateador de porcentajes
+    function fmt(val) {
+      if (val === undefined || val === null || isNaN(val)) return 'S/D';
+      return Number(val).toFixed(2) + '%';
+    }
+
     // ==========================================
-    // SECCIÓN 1: CAPA DE RADIOS CENSALES (INMAT)
+    // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
     // ==========================================
 
     function getColorINMAT(d) {
       return d > 33.3 ? '#d7191c' :  // Rojo
              d > 11.5 ? '#fdae61' :  // Naranja
              d > 4.4  ? '#ffffbf' :  // Amarillo
-             d > 1.5  ? '#abdda4' :  // Verde/Celeste claro
+             d > 1.5  ? '#abdda4' :  // Verde/Celeste
                         '#2b83ba';   // Azul
     }
 
     function styleINMAT(feature) {
-      const valor = feature.properties.pc_Cal_IV || 0;
       return {
-        fillColor: getColorINMAT(valor),
+        fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
         stroke: false,
         fillOpacity: 0.85
       };
     }
 
-    function fmt(val) {
-      if (val === undefined || val === null || isNaN(val)) return 'S/D';
-      return Number(val).toFixed(2) + '%';
+    function onEachFeatureINMAT(feature, layer) {
+      const p = feature.properties;
+      if (!p) return;
+
+      const partido = p.DPTO || 'Sin Municipio';
+      const codigo  = p.REDCODE || 'S/D';
+
+      const popupContent = `
+        <div style="font-family: Arial, sans-serif; min-width: 220px;">
+          <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
+            Partido: ${partido}
+          </div>
+          <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
+            Radio Censal: ${codigo}
+          </div>
+          <table class="popup-table">
+            <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
+            <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
+            <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
+            <tr style="background-color: #fff5f5; font-weight: bold;">
+              <td style="color: #c53030;">Calidad IV (Precaria):</td>
+              <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
+            </tr>
+            <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
+          </table>
+        </div>
+      `;
+      layer.bindPopup(popupContent);
     }
 
-    function onEachFeatureINMAT(feature, layer) {
-      if (feature.properties) {
-        const p = feature.properties;
+    // ==========================================
+    // SECCIÓN 2: CAPA DE SALUD (PUNTOS)
+    // ==========================================
 
-        const partido = p.DPTO || p.dpto || p.Dpto || 'Sin Municipio';
-        const codigo = p.REDCODE || p.redcode || p.Redcode || 'S/D';
-
-        const cal1 = fmt(p.pc_Cal_I);
-        const cal2 = fmt(p.pc_Cal_II);
-        const cal3 = fmt(p.pc_Cal_III);
-        const cal4 = fmt(p.pc_Cal_IV);
-
-        // Búsqueda flexible para pc_ignorado
-        const valIgnorado = p.pc_Ignorado ?? p.pc_ignorado ?? p.pc_Ignora ?? p.pc_ignora ?? p.PC_IGNORADO ?? p.pc_IGNORADO ?? p.Ignorado ?? p.ignorado;
-        const ign = fmt(valIgnorado);
-
-        const popupContent = `
-          <div style="font-family: Arial, sans-serif; min-width: 220px;">
-            <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">
-              Partido: ${partido}
-            </div>
-            <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
-              Radio Censal: ${codigo}
-            </div>
-            <table class="popup-table">
-              <tr>
-                <td><strong>Calidad I (Buena):</strong></td>
-                <td style="text-align: right;">${cal1}</td>
-              </tr>
-              <tr>
-                <td><strong>Calidad II (Aceptable):</strong></td>
-                <td style="text-align: right;">${cal2}</td>
-              </tr>
-              <tr>
-                <td><strong>Calidad III (Deficiente):</strong></td>
-                <td style="text-align: right;">${cal3}</td>
-              </tr>
-              <tr style="background-color: #fff5f5; font-weight: bold;">
-                <td style="color: #c53030;">Calidad IV (Precaria):</td>
-                <td style="text-align: right; color: #c53030;">${cal4}</td>
-              </tr>
-              <tr>
-                <td><span style="color: #718096;">Ignorado:</span></td>
-                <td style="text-align: right; color: #718096;">${ign}</td>
-              </tr>
-            </table>
-          </div>
-        `;
-
-        layer.bindPopup(popupContent);
+    // Mapeo directo de colores según tus valores exactos
+    function getSaludColor(origen) {
+      switch (origen) {
+        case 'Estatal':        return '#2b6cb0'; // Azul
+        case 'Privado':        return '#e53e3e'; // Rojo
+        case 'Obras Sociales': return '#dd6b20'; // Naranja
+        default:               return '#718096'; // Gris para nulos/otros
       }
     }
 
-    // ==========================================
-    // SECCIÓN 2: CAPA DE ESTABLECIMIENTOS DE SALUD
-    // ==========================================
-
-    // Color del punto según Origen de Financiamiento
-    function getSaludColor(origen) {
-      if (!origen) return '#718096';
-      const text = origen.toString().toLowerCase();
-
-      if (text.includes('público') || text.includes('publico') || text.includes('estatal')) return '#2b6cb0'; // Azul
-      if (text.includes('privado')) return '#e53e3e'; // Rojo
-      if (text.includes('obra social') || text.includes('obras sociales')) return '#dd6b20'; // Naranja
-      if (text.includes('mixto') || text.includes('cooperativa')) return '#805ad5'; // Morado
-      return '#319795'; // Teal / Verde agua para otros
-    }
-
     function pointToLayerSalud(feature, latlng) {
-      const origen = feature.properties.origen_financiamiento;
       return L.circleMarker(latlng, {
-        radius: 6,
-        fillColor: getSaludColor(origen),
+        radius: 5,
+        fillColor: getSaludColor(feature.properties.origen_financiamiento),
         color: '#ffffff',
-        weight: 1.5,
+        weight: 1,
         opacity: 1,
         fillOpacity: 0.9
       });
     }
 
     function onEachFeatureSalud(feature, layer) {
-      if (feature.properties) {
-        const p = feature.properties;
+      const p = feature.properties;
+      if (!p) return;
 
-        const nombre = p.establecimiento_nombre || p.nombre || 'Establecimiento de Salud';
-        const partido = p.departamento_nombre || p.departamento || p.partido || 'S/D';
-        const localidad = p.localidad_nombre || p.localidad || 'S/D';
-        const tipologia = p.tipologia_nombre || p.tipologia || 'S/D';
-        const financiamiento = p.origen_financiamiento || 'S/D';
+      const nombre        = p.establecimiento_nombre || 'Establecimiento de Salud';
+      const partido       = p.departamento_nombre || 'S/D';
+      const localidad     = p.localidad_nombre || 'S/D';
+      const tipologia     = p.tipologia_nombre || 'S/D';
+      const financiamiento = p.origen_financiamiento || 'Sin Datos';
 
-        const popupContent = `
-          <div style="font-family: Arial, sans-serif; min-width: 230px;">
-            <div class="health-popup-title">
-              🏥 ${nombre}
-            </div>
-            <div class="health-popup-detail">
-              <strong>Partido:</strong> ${partido}
-            </div>
-            <div class="health-popup-detail">
-              <strong>Localidad:</strong> ${localidad}
-            </div>
-            <div class="health-popup-detail">
-              <strong>Tipo:</strong> ${tipologia}
-            </div>
-            <div class="health-popup-detail" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
-              <strong>Financiamiento:</strong> <span style="color: ${getSaludColor(financiamiento)}; font-weight: bold;">${financiamiento}</span>
-            </div>
+      const popupContent = `
+        <div style="font-family: Arial, sans-serif; min-width: 230px;">
+          <div class="health-popup-title">🏥 ${nombre}</div>
+          <div class="health-popup-detail"><strong>Partido:</strong> ${partido}</div>
+          <div class="health-popup-detail"><strong>Localidad:</strong> ${localidad}</div>
+          <div class="health-popup-detail"><strong>Tipo:</strong> ${tipologia}</div>
+          <div class="health-popup-detail" style="margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+            <strong>Financiamiento:</strong> 
+            <span style="color: ${getSaludColor(financiamiento)}; font-weight: bold;">${financiamiento}</span>
           </div>
-        `;
-
-        layer.bindPopup(popupContent);
-      }
+        </div>
+      `;
+      layer.bindPopup(popupContent);
     }
 
     // ==========================================
-    // SECCIÓN 3: CARGA DE CAPAS GEOJSON Y CONTROL
+    // SECCIÓN 3: CARGA Y CONTROL DE CAPAS
     // ==========================================
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
-    const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
+    const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_fil.geojson';
 
-    // Declaración de capas
     let inmatLayer, saludLayer;
 
-    // Cargar INMAT
     fetch(urlINMAT)
       .then(res => res.json())
       .then(data => {
@@ -290,7 +249,6 @@
 
         map.fitBounds(inmatLayer.getBounds());
 
-        // Cargar Centros de Salud después de INMAT
         return fetch(urlSalud);
       })
       .then(res => res.json())
@@ -300,54 +258,50 @@
           onEachFeature: onEachFeatureSalud
         }).addTo(map);
 
-        // Agregar selector de capas en la esquina superior derecha
-        const overlays = {
+        L.control.layers(null, {
           " Radios Censales (INMAT IV)": inmatLayer,
-          "🏥 Establecimientos de Salud": saludLayer
-        };
-
-        L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+          "🏥 Salud (por Financiamiento)": saludLayer
+        }, { collapsed: false }).addTo(map);
       })
-      .catch(error => console.error('Error al cargar capas:', error));
+      .catch(err => console.error('Error cargando los GeoJSON:', err));
 
     // ==========================================
-    // SECCIÓN 4: LEYENDA INMAT
+    // SECCIÓN 4: LEYENDA PRINCIPAL
     // ==========================================
 
     const legend = L.control({ position: 'bottomright' });
 
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
-      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+      
+      let html = `<div class="legend-title">Establecimientos de Salud</div>`;
+      html += `
+        <div class="legend-scale">
+          <i class="circle" style="background:#2b6cb0;"></i> Estatal<br>
+          <i class="circle" style="background:#e53e3e;"></i> Privado<br>
+          <i class="circle" style="background:#dd6b20;"></i> Obras Sociales<br>
+        </div>
+      `;
 
-      let html = `<div class="legend-title">Porcentaje de hogares con calidad 4 de los materiales de la vivienda (INMAT)</div>`;
-
+      html += `<div class="legend-title" style="margin-top:12px;">Hogares con INMAT IV (Precaria)</div>`;
       html += `<div class="legend-scale">`;
+      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
       for (let i = 0; i < breaks.length - 1; i++) {
-        const from = breaks[i];
-        const to = breaks[i + 1];
-
-        html +=
-          '<i style="background:' + getColorINMAT(from + 0.01) + '"></i> ' +
-          from + '%' + ' &ndash; ' + to + '%<br>';
+        html += `<i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%<br>`;
       }
       html += `</div>`;
 
       html += `
         <details class="legend-details">
-          <summary>Ver definiciones INMAT (I a IV)</summary>
-          <p><strong>Calidad 1 (INMAT I):</strong> Materiales resistentes y de buena calidad en todos los componentes (pisos, paredes y techos).</p>
-          <p><strong>Calidad 2 (INMAT II):</strong> Materiales resistentes en general, pero con alguna carencia menor en revestimientos o aislación.</p>
-          <p><strong>Calidad 3 (INMAT III):</strong> Materiales poco resistentes o deficitarios en al menos uno de los elementos principales de la construcción.</p>
-          <p><strong>Calidad 4 (INMAT IV):</strong> Materiales no resistentes o precarios en la mayoría de los componentes de la estructura habitacional.</p>
+          <summary>Ver definiciones INMAT</summary>
+          <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
+          <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
+          <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
+          <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
         </details>
       `;
 
-      html += `
-        <div class="legend-source">
-          Elaborado en base al Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC), procesado con REDATAM.
-        </div>
-      `;
+      html += `<div class="legend-source">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
 
       div.innerHTML = html;
       return div;
