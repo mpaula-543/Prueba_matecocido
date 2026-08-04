@@ -11,7 +11,7 @@
     body { margin: 0; padding: 0; }
     #map { width: 100vw; height: 100vh; }
     
-    /* Estilos del recuadro de la leyenda y nota metodológica */
+    /* Estilos del recuadro de la leyenda */
     .info.legend {
       background: rgba(255, 255, 255, 0.95);
       padding: 12px 16px;
@@ -47,7 +47,6 @@
       border-radius: 2px;
     }
 
-    /* Sección desplegable con referencias metodológicas */
     .legend-details {
       margin-top: 8px;
       font-size: 11px;
@@ -68,7 +67,6 @@
       margin: 4px 0;
     }
 
-    /* Fuente / Aclaración al pie */
     .legend-source {
       margin-top: 8px;
       font-size: 10px;
@@ -76,6 +74,25 @@
       font-style: italic;
       border-top: 1px solid #eee;
       padding-top: 6px;
+    }
+
+    /* Estilos para la tabla del Popup */
+    .popup-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .popup-table th, .popup-table td {
+      padding: 3px 6px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    .popup-table th {
+      background-color: #f7fafc;
+      color: #2d3748;
     }
   </style>
 </head>
@@ -103,32 +120,67 @@
                         '#2b83ba';   // Azul
     }
 
-    // 4. Estilo gráfico de los polígonos
+    // 4. Estilo gráfico de los polígonos (SIN BORDE / Transparente)
     function style(feature) {
       const valor = feature.properties.pc_Cal_IV || 0;
       return {
         fillColor: getColor(valor),
-        weight: 0.5,
-        opacity: 1,
-        color: '#ffffff',
-        fillOpacity: 0.8
+        stroke: false,       // Quita el borde por completo
+        fillOpacity: 0.85    // Ligera opacidad para apreciar la capa base
       };
     }
 
-    // 5. Configuración de ventanas emergentes (Popups)
+    // Función auxiliar para formatear valores numéricos a porcentaje
+    function fmt(val) {
+      if (val === undefined || val === null || isNaN(val)) return 'S/D';
+      return Number(val).toFixed(2) + '%';
+    }
+
+    // 5. Configuración de ventanas emergentes (Popups) completas
     function onEachFeature(feature, layer) {
       if (feature.properties) {
-        const codigo = feature.properties.Código || feature.properties.Codigo || 'S/D';
-        const val = feature.properties.pc_Cal_IV !== undefined 
-          ? Number(feature.properties.pc_Cal_IV).toFixed(2) + '%' 
-          : 'Sin datos';
+        const p = feature.properties;
 
-        layer.bindPopup(`
-          <div style="font-family: Arial, sans-serif;">
-            <strong>Código:</strong> ${codigo}<br/>
-            <strong>% Calidad IV:</strong> ${val}
+        // Búsqueda flexible del código del radio censal
+        const codigo = p.Código || p.Codigo || p.CODIGO || p.codigo || p.Code || p.ID || p.LINK || p.radio || 'S/D';
+
+        const cal1 = fmt(p.pc_Cal_I);
+        const cal2 = fmt(p.pc_Cal_II);
+        const cal3 = fmt(p.pc_Cal_III);
+        const cal4 = fmt(p.pc_Cal_IV);
+        const ign  = fmt(p.pc_Ignorado || p.pc_ignorado);
+
+        const popupContent = `
+          <div style="font-family: Arial, sans-serif; min-width: 210px;">
+            <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 2px;">
+              Radio Censal: ${codigo}
+            </div>
+            <table class="popup-table">
+              <tr>
+                <td><strong>Calidad I (Buena):</strong></td>
+                <td style="text-align: right;">${cal1}</td>
+              </tr>
+              <tr>
+                <td><strong>Calidad II (Aceptable):</strong></td>
+                <td style="text-align: right;">${cal2}</td>
+              </tr>
+              <tr>
+                <td><strong>Calidad III (Deficiente):</strong></td>
+                <td style="text-align: right;">${cal3}</td>
+              </tr>
+              <tr style="background-color: #fff5f5; font-weight: bold;">
+                <td style="color: #c53030;">Calidad IV (Precaria):</td>
+                <td style="text-align: right; color: #c53030;">${cal4}</td>
+              </tr>
+              <tr>
+                <td><span style="color: #718096;">Ignorado:</span></td>
+                <td style="text-align: right; color: #718096;">${ign}</td>
+              </tr>
+            </table>
           </div>
-        `);
+        `;
+
+        layer.bindPopup(popupContent);
       }
     }
 
@@ -153,17 +205,15 @@
       })
       .catch(error => console.error('Error al cargar el GeoJSON:', error));
 
-    // 7. Leyenda completa con Título, Escala, Referencias INMAT y Fuente
+    // 7. Leyenda completa
     const legend = L.control({ position: 'bottomright' });
 
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
       const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
 
-      // Título
       let html = `<div class="legend-title">Porcentaje de hogares con calidad 4 de los materiales de la vivienda (INMAT)</div>`;
 
-      // Escala cromática de rangos
       html += `<div class="legend-scale">`;
       for (let i = 0; i < breaks.length - 1; i++) {
         const from = breaks[i];
@@ -175,7 +225,6 @@
       }
       html += `</div>`;
 
-      // Aclaraciones sobre la clasificación INMAT (Desplegable)
       html += `
         <details class="legend-details">
           <summary>Ver definiciones INMAT (I a IV)</summary>
@@ -186,7 +235,6 @@
         </details>
       `;
 
-      // Fuente y aclaración
       html += `
         <div class="legend-source">
           Elaborado en base al Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC), procesado con REDATAM.
