@@ -115,74 +115,75 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <script>
-    // 1. Inicializar el mapa
-    const map = L.map('map').setView([-34.6037, -58.3816], 10);
+ <script>
+  // 1. Inicializar el mapa
+  const map = L.map('map').setView([-34.6037, -58.3816], 10);
 
-    // 2. Capa base ARGENMAP
-    L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capasbase:argenmap_gris@EPSG%3A3857@png/{z}/{x}/{-\y}.png', {
-  attribution: '&copy; <a href="https://www.ign.gob.ar/">IGN Argentina</a>',
-  minZoom: 3,
-  maxZoom: 18
-}).addTo(map);
+  // 2. Capa base ARGENMAP Gris (Corregida)
+  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capasbase:argenmap_gris@EPSG%3A3857@png/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.ign.gob.ar/">IGN Argentina</a>',
+    minZoom: 3,
+    maxZoom: 18,
+    tms: true
+  }).addTo(map);
 
-    // Formateador de porcentajes
-    function fmt(val) {
-      if (val === undefined || val === null || isNaN(val)) return 'S/D';
-      return Number(val).toFixed(2) + '%';
-    }
+  // Formateador de porcentajes
+  function fmt(val) {
+    if (val === undefined || val === null || isNaN(val)) return 'S/D';
+    return Number(val).toFixed(2) + '%';
+  }
 
-    // ==========================================
-    // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
-    // ==========================================
+  // ==========================================
+  // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
+  // ==========================================
 
-    function getColorINMAT(d) {
-  return d > 33.3 ? '#4a148c' :  // Violeta muy oscuro / Púrpura intenso
-         d > 11.5 ? '#7b1fa2' :  // Violeta oscuro
-         d > 4.4  ? '#ab47bc' :  // Violeta medio
-         d > 1.5  ? '#ce93d8' :  // Violeta claro
-                    '#f3e5f5';   // Violeta muy suave / casi blanco
-}
+  function getColorINMAT(d) {
+    return d > 33.3 ? '#4a148c' :  // Violeta muy oscuro / Púrpura intenso
+           d > 11.5 ? '#7b1fa2' :  // Violeta oscuro
+           d > 4.4  ? '#ab47bc' :  // Violeta medio
+           d > 1.5  ? '#ce93d8' :  // Violeta claro
+                      '#f3e5f5';   // Violeta muy suave / casi blanco
+  }
 
-    function styleINMAT(feature) {
-      return {
-        fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
-        stroke: false,
-        fillOpacity: 0.85
-      };
-    }
+  function styleINMAT(feature) {
+    return {
+      fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
+      stroke: false,
+      fillOpacity: 0.85
+    };
+  }
 
-    function onEachFeatureINMAT(feature, layer) {
-      const p = feature.properties;
-      if (!p) return;
+  function onEachFeatureINMAT(feature, layer) {
+    const p = feature.properties;
+    if (!p) return;
 
-      const partido = p.DPTO || 'Sin Municipio';
-      const codigo  = p.REDCODE || 'S/D';
+    const partido = p.DPTO || 'Sin Municipio';
+    const codigo  = p.REDCODE || 'S/D';
 
-      const popupContent = `
-        <div style="font-family: Arial, sans-serif; min-width: 220px;">
-          <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
-            Partido: ${partido}
-          </div>
-          <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
-            Radio Censal: ${codigo}
-          </div>
-          <table class="popup-table">
-            <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
-            <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
-            <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
-            <tr style="background-color: #fff5f5; font-weight: bold;">
-              <td style="color: #c53030;">Calidad IV (Precaria):</td>
-              <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
-            </tr>
-            <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
-          </table>
+    const popupContent = `
+      <div style="font-family: Arial, sans-serif; min-width: 220px;">
+        <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
+          Partido: ${partido}
         </div>
-      `;
-      layer.bindPopup(popupContent);
-    }
-
-    // ==========================================
+        <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
+          Radio Censal: ${codigo}
+        </div>
+        <table class="popup-table">
+          <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
+          <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
+          <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
+          <tr style="background-color: #fff5f5; font-weight: bold;">
+            <td style="color: #c53030;">Calidad IV (Precaria):</td>
+            <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
+          </tr>
+          <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
+        </table>
+      </div>
+    `;
+    layer.bindPopup(popupContent);
+  }
+   
+   // ==========================================
     // SECCIÓN 2: CAPA DE SALUD (PUNTOS)
     // ==========================================
 
