@@ -115,92 +115,91 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
- <script>
-  // 1. Inicializar el mapa
-  const map = L.map('map').setView([-34.6037, -58.3816], 10);
+  <script>
+    // 1. Inicializar el mapa
+    const map = L.map('map').setView([-34.6037, -58.3816], 10);
 
-  // 2. Capa base ARGENMAP Gris (Corregida)
-  L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capasbase:argenmap_gris@EPSG%3A3857@png/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.ign.gob.ar/">IGN Argentina</a>',
-    minZoom: 3,
-    maxZoom: 18,
-    tms: true
-  }).addTo(map);
+    // 2. Capa base ARGENMAP Gris
+    L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capasbase:argenmap_gris@EPSG%3A3857@png/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.ign.gob.ar/">IGN Argentina</a>',
+      minZoom: 3,
+      maxZoom: 18,
+      tms: true
+    }).addTo(map);
 
-  // Formateador de porcentajes
-  function fmt(val) {
-    if (val === undefined || val === null || isNaN(val)) return 'S/D';
-    return Number(val).toFixed(2) + '%';
-  }
+    // Formateador de porcentajes
+    function fmt(val) {
+      if (val === undefined || val === null || isNaN(val)) return 'S/D';
+      return Number(val).toFixed(2) + '%';
+    }
 
-  // ==========================================
-  // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
-  // ==========================================
+    // ==========================================
+    // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
+    // ==========================================
 
-  function getColorINMAT(d) {
-    return d > 33.3 ? '#4a148c' :  // Violeta muy oscuro / Púrpura intenso
-           d > 11.5 ? '#7b1fa2' :  // Violeta oscuro
-           d > 4.4  ? '#ab47bc' :  // Violeta medio
-           d > 1.5  ? '#ce93d8' :  // Violeta claro
-                      '#f3e5f5';   // Violeta muy suave / casi blanco
-  }
+    function getColorINMAT(d) {
+      return d > 33.3 ? '#4a148c' :
+             d > 11.5 ? '#7b1fa2' :
+             d > 4.4  ? '#ab47bc' :
+             d > 1.5  ? '#ce93d8' :
+                        '#f3e5f5';
+    }
 
-  function styleINMAT(feature) {
-    return {
-      fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
-      stroke: false,
-      fillOpacity: 0.85
-    };
-  }
+    function styleINMAT(feature) {
+      return {
+        fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
+        stroke: false,
+        fillOpacity: 0.85
+      };
+    }
 
-  function onEachFeatureINMAT(feature, layer) {
-    const p = feature.properties;
-    if (!p) return;
+    function onEachFeatureINMAT(feature, layer) {
+      const p = feature.properties;
+      if (!p) return;
 
-    const partido = p.DPTO || 'Sin Municipio';
-    const codigo  = p.REDCODE || 'S/D';
+      const partido = p.DPTO || 'Sin Municipio';
+      const codigo  = p.REDCODE || 'S/D';
 
-    const popupContent = `
-      <div style="font-family: Arial, sans-serif; min-width: 220px;">
-        <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
-          Partido: ${partido}
+      const popupContent = `
+        <div style="font-family: Arial, sans-serif; min-width: 220px;">
+          <div style="font-size: 11px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
+            Partido: ${partido}
+          </div>
+          <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
+            Radio Censal: ${codigo}
+          </div>
+          <table class="popup-table">
+            <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
+            <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
+            <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
+            <tr style="background-color: #fff5f5; font-weight: bold;">
+              <td style="color: #c53030;">Calidad IV (Precaria):</td>
+              <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
+            </tr>
+            <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
+          </table>
         </div>
-        <div style="font-weight: bold; font-size: 13px; color: #2d3748; margin-bottom: 6px; border-bottom: 2px solid #3182ce; padding-bottom: 3px;">
-          Radio Censal: ${codigo}
-        </div>
-        <table class="popup-table">
-          <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
-          <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
-          <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
-          <tr style="background-color: #fff5f5; font-weight: bold;">
-            <td style="color: #c53030;">Calidad IV (Precaria):</td>
-            <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
-          </tr>
-          <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
-        </table>
-      </div>
-    `;
-    layer.bindPopup(popupContent);
-  }
+      `;
+      layer.bindPopup(popupContent);
+    }
    
-   // ==========================================
+    // ==========================================
     // SECCIÓN 2: CAPA DE SALUD (PUNTOS)
     // ==========================================
 
-    // Mapeo directo de colores según tus valores exactos
     function getSaludColor(origen) {
       switch (origen) {
-        case 'FFAA/Seguridad':        return '#a6cee3'; // Celeste
-        case 'Municipal':        return '#1f78b4'; // Azul
-        case 'Mutual':       return '#b2df8a'; // Verde claro
-        case 'Nacional':       return '#33a02c';  // Verde oscuro
-        case 'Privado':       return '#fb9a99'; //rosa
-        case 'Provincial':       return '#e31a1c'; // rojo
-        case 'Seguridad social':       return '#fdbf6f'; // Naranja claro
-        case 'Servicio Penitenciario Federal':         return '#ff7f00'; // Naranja
-        case 'Servicio Penitenciario Provincial':         return '#cab2d6'; // Lila  
-        case 'Universitario público':         return '#6a3d9a'; // Violeta 
-        default:               return '#718096'; // Gris para nulos/otros
+        case 'FFAA/Seguridad':                       return '#a6cee3';
+        case 'Municipal':                            return '#1f78b4';
+        case 'Mutual':                               return '#b2df8a';
+        case 'Nacional':                             return '#33a02c';
+        case 'Privado':                              return '#fb9a99';
+        case 'Provincial':                           return '#e31a1c';
+        case 'Seguridad social':                     return '#fdbf6f';
+        case 'Servicio Penitenciario Federal':        return '#ff7f00';
+        case 'Servicio Penitenciario Provincial':     return '#cab2d6';
+        case 'Universitario público':                return '#6a3d9a';
+        default:                                     return '#718096';
       }
     }
 
@@ -219,10 +218,10 @@
       const p = feature.properties;
       if (!p) return;
 
-      const nombre        = p.establecimiento_nombre || 'Establecimiento de Salud';
-      const partido       = p.departamento_nombre || 'S/D';
-      const localidad     = p.localidad_nombre || 'S/D';
-      const tipologia     = p.tipologia_nombre || 'S/D';
+      const nombre         = p.establecimiento_nombre || 'Establecimiento de Salud';
+      const partido        = p.departamento_nombre || 'S/D';
+      const localidad      = p.localidad_nombre || 'S/D';
+      const tipologia      = p.tipologia_nombre || 'S/D';
       const financiamiento = p.origen_financiamiento || 'Sin Datos';
 
       const popupContent = `
@@ -241,7 +240,7 @@
     }
 
     // ==========================================
-    // SECCIÓN 3: CARGA Y CONTROL DE CAPAS (Mejorado)
+    // SECCIÓN 3: CARGA Y CONTROL DE CAPAS
     // ==========================================
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
@@ -249,7 +248,6 @@
 
     let inmatLayer, saludLayer;
 
-    // Función auxiliar para validar respuestas HTTP
     function fetchGeoJSON(url) {
       return fetch(url).then(res => {
         if (!res.ok) {
@@ -259,26 +257,21 @@
       });
     }
 
-    // Cargar ambas capas en paralelo
     Promise.all([fetchGeoJSON(urlINMAT), fetchGeoJSON(urlSalud)])
       .then(([dataINMAT, dataSalud]) => {
         
-        // 1. Capa INMAT
         inmatLayer = L.geoJSON(dataINMAT, {
           style: styleINMAT,
           onEachFeature: onEachFeatureINMAT
         }).addTo(map);
 
-        // Ajustar el zoom al encuadre de la capa INMAT
         map.fitBounds(inmatLayer.getBounds());
 
-        // 2. Capa Salud
         saludLayer = L.geoJSON(dataSalud, {
           pointToLayer: pointToLayerSalud,
           onEachFeature: onEachFeatureSalud
         }).addTo(map);
 
-        // 3. Control de capas (se añade únicamente cuando ambas capas cargaron)
         L.control.layers(null, {
           "🏚️ Radios Censales (INMAT IV)": inmatLayer,
           "🏥 Salud (por Financiamiento)": saludLayer
@@ -287,65 +280,64 @@
       })
       .catch(err => console.error('Error cargando los datos GeoJSON:', err));
 
-   // ==========================================
-// SECCIÓN 4: LEYENDA PRINCIPAL
-// ==========================================
+    // ==========================================
+    // SECCIÓN 4: LEYENDA PRINCIPAL
+    // ==========================================
 
-const legend = L.control({ position: 'bottomright' });
+    const legend = L.control({ position: 'bottomright' });
 
-legend.onAdd = function () {
-  const div = L.DomUtil.create('div', 'info legend');
+    legend.onAdd = function () {
+      const div = L.DomUtil.create('div', 'info legend');
 
-  // Mapeo de categorías de salud con sus colores exactos
-  const saludCategorias = [
-    { nombre: 'Municipal', color: '#1f78b4' },
-    { nombre: 'Provincial', color: '#e31a1c' },
-    { nombre: 'Nacional', color: '#33a02c' },
-    { nombre: 'Privado', color: '#fb9a99' },
-    { nombre: 'Seguridad social', color: '#fdbf6f' },
-    { nombre: 'Mutual', color: '#b2df8a' },
-    { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
-    { nombre: 'Servicio Penitenciario Federal', color: '#ff7f00' },
-    { nombre: 'Servicio Penitenciario Provincial', color: '#cab2d6' },
-    { nombre: 'Universitario público', color: '#6a3d9a' }
-  ];
+      const saludCategorias = [
+        { nombre: 'Municipal', color: '#1f78b4' },
+        { nombre: 'Provincial', color: '#e31a1c' },
+        { nombre: 'Nacional', color: '#33a02c' },
+        { nombre: 'Privado', color: '#fb9a99' },
+        { nombre: 'Seguridad social', color: '#fdbf6f' },
+        { nombre: 'Mutual', color: '#b2df8a' },
+        { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
+        { nombre: 'Servicio Penitenciario Federal', color: '#ff7f00' },
+        { nombre: 'Servicio Penitenciario Provincial', color: '#cab2d6' },
+        { nombre: 'Universitario público', color: '#6a3d9a' }
+      ];
 
-  let html = `<div class="legend-title">Establecimientos de Salud</div>`;
-  html += `<div class="legend-scale">`;
+      let html = `<div class="legend-title">Establecimientos de Salud</div>`;
+      html += `<div class="legend-scale">`;
 
-  // Generar cada ítem de salud dinámicamente
-  saludCategorias.forEach(cat => {
-    html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
-  });
+      saludCategorias.forEach(cat => {
+        html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
+      });
 
-  html += `</div>`;
+      html += `</div>`;
 
-  // Leyenda para INMAT IV
-  html += `<div class="legend-title" style="margin-top:12px;">Hogares con INMAT IV (Precaria)</div>`;
-  html += `<div class="legend-scale">`;
-  const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
-  for (let i = 0; i < breaks.length - 1; i++) {
-    html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
-  }
-  html += `</div>`;
+      html += `<div class="legend-title" style="margin-top:12px;">Hogares con INMAT IV (Precaria)</div>`;
+      html += `<div class="legend-scale">`;
+      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+      for (let i = 0; i < breaks.length - 1; i++) {
+        html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
+      }
+      html += `</div>`;
 
-  // Detalles adicionales
-  html += `
-    <details class="legend-details" style="margin-top: 8px;">
-      <summary style="cursor: pointer; font-weight: bold; font-size: 11px;">Ver definiciones INMAT</summary>
-      <div style="font-size: 11px; margin-top: 4px; color: #4a5568;">
-        <p style="margin: 2px 0;"><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
-        <p style="margin: 2px 0;"><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
-        <p style="margin: 2px 0;"><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
-        <p style="margin: 2px 0;"><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
-      </div>
-    </details>
-  `;
+      html += `
+        <details class="legend-details" style="margin-top: 8px;">
+          <summary style="cursor: pointer; font-weight: bold; font-size: 11px;">Ver definiciones INMAT</summary>
+          <div style="font-size: 11px; margin-top: 4px; color: #4a5568;">
+            <p style="margin: 2px 0;"><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
+            <p style="margin: 2px 0;"><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
+            <p style="margin: 2px 0;"><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
+            <p style="margin: 2px 0;"><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
+          </div>
+        </details>
+      `;
 
-  html += `<div class="legend-source" style="margin-top: 8px; font-size: 10px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 4px;">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
+      html += `<div class="legend-source" style="margin-top: 8px; font-size: 10px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 4px;">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
 
-  div.innerHTML = html;
-  return div;
-};
+      div.innerHTML = html;
+      return div;
+    };
 
-legend.addTo(map);
+    legend.addTo(map);
+  </script>
+</body>
+</html>
