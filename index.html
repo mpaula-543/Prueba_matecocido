@@ -241,7 +241,7 @@
     }
 
     // ==========================================
-    // SECCIÓN 3: CARGA Y CONTROL DE CAPAS
+    // SECCIÓN 3: CARGA Y CONTROL DE CAPAS (Mejorado)
     // ==========================================
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
@@ -249,33 +249,45 @@
 
     let inmatLayer, saludLayer;
 
-    fetch(urlINMAT)
-      .then(res => res.json())
-      .then(data => {
-        inmatLayer = L.geoJSON(data, {
+    // Función auxiliar para validar respuestas HTTP
+    function fetchGeoJSON(url) {
+      return fetch(url).then(res => {
+        if (!res.ok) {
+          throw new Error(`Error ${res.status} al cargar ${url}`);
+        }
+        return res.json();
+      });
+    }
+
+    // Cargar ambas capas en paralelo
+    Promise.all([fetchGeoJSON(urlINMAT), fetchGeoJSON(urlSalud)])
+      .then(([dataINMAT, dataSalud]) => {
+        
+        // 1. Capa INMAT
+        inmatLayer = L.geoJSON(dataINMAT, {
           style: styleINMAT,
           onEachFeature: onEachFeatureINMAT
         }).addTo(map);
 
+        // Ajustar el zoom al encuadre de la capa INMAT
         map.fitBounds(inmatLayer.getBounds());
 
-        return fetch(urlSalud);
-      })
-      .then(res => res.json())
-      .then(data => {
-        saludLayer = L.geoJSON(data, {
+        // 2. Capa Salud
+        saludLayer = L.geoJSON(dataSalud, {
           pointToLayer: pointToLayerSalud,
           onEachFeature: onEachFeatureSalud
         }).addTo(map);
 
+        // 3. Control de capas (se añade únicamente cuando ambas capas cargaron)
         L.control.layers(null, {
-          " Radios Censales (INMAT IV)": inmatLayer,
+          "🏚️ Radios Censales (INMAT IV)": inmatLayer,
           "🏥 Salud (por Financiamiento)": saludLayer
         }, { collapsed: false }).addTo(map);
-      })
-      .catch(err => console.error('Error cargando los GeoJSON:', err));
 
-    // ==========================================
+      })
+      .catch(err => console.error('Error cargando los datos GeoJSON:', err));
+
+   // ==========================================
 // SECCIÓN 4: LEYENDA PRINCIPAL
 // ==========================================
 
@@ -303,7 +315,7 @@ legend.onAdd = function () {
 
   // Generar cada ítem de salud dinámicamente
   saludCategorias.forEach(cat => {
-    html += `<i class="circle" style="background:${cat.color};"></i> ${cat.nombre}<br>`;
+    html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
   });
 
   html += `</div>`;
@@ -313,22 +325,24 @@ legend.onAdd = function () {
   html += `<div class="legend-scale">`;
   const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
   for (let i = 0; i < breaks.length - 1; i++) {
-    html += `<i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%<br>`;
+    html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
   }
   html += `</div>`;
 
   // Detalles adicionales
   html += `
-    <details class="legend-details">
-      <summary>Ver definiciones INMAT</summary>
-      <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
-      <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
-      <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
-      <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
+    <details class="legend-details" style="margin-top: 8px;">
+      <summary style="cursor: pointer; font-weight: bold; font-size: 11px;">Ver definiciones INMAT</summary>
+      <div style="font-size: 11px; margin-top: 4px; color: #4a5568;">
+        <p style="margin: 2px 0;"><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
+        <p style="margin: 2px 0;"><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
+        <p style="margin: 2px 0;"><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
+        <p style="margin: 2px 0;"><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
+      </div>
     </details>
   `;
 
-  html += `<div class="legend-source">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
+  html += `<div class="legend-source" style="margin-top: 8px; font-size: 10px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 4px;">Censo 2022 (INDEC) & REFES (Min. Salud)</div>`;
 
   div.innerHTML = html;
   return div;
