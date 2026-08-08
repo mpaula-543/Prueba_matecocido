@@ -11,6 +11,26 @@
     body { margin: 0; padding: 0; }
     #map { width: 100vw; height: 100vh; }
     
+    /* Personalización del Selector de Capas */
+    .leaflet-control-layers-title {
+      font-weight: bold;
+      font-size: 11px;
+      color: #2d3748;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .leaflet-control-layers-group-title {
+      font-weight: bold;
+      font-size: 10.5px;
+      color: #4a5568;
+      margin-top: 6px;
+      margin-bottom: 4px;
+    }
+
     /* Estilos del recuadro de las leyendas */
     .info.legend {
       background: rgba(255, 255, 255, 0.95);
@@ -56,7 +76,7 @@
 
     .legend-scale { margin-bottom: 6px; }
 
-    /* Íconos más pequeños */
+    /* Íconos referencias */
     .legend-scale i {
       width: 11px;
       height: 11px;
@@ -180,9 +200,9 @@
     });
 
     const baseMaps = {
-      "🛰️ Google Satelital": googleSat,
-      "🗺️ Google Maps": googleStreets,
-      "🌍 OpenStreetMap": osm
+      "Google Satelital": googleSat,
+      "Google Maps": googleStreets,
+      "OpenStreetMap": osm
     };
 
     function fmt(val) {
@@ -262,7 +282,7 @@
 
     function pointToLayerSalud(feature, latlng) {
       return L.circleMarker(latlng, {
-        radius: 2.5, // Puntos más pequeños
+        radius: 2.5,
         fillColor: getSaludColor(feature.properties.origen_financiamiento),
         color: '#ffffff',
         weight: 0.4,
@@ -283,7 +303,7 @@
 
       const popupContent = `
         <div style="font-family: Arial, sans-serif; min-width: 210px;">
-          <div class="health-popup-title">🏥 ${nombre}</div>
+          <div class="health-popup-title">${nombre}</div>
           <div class="health-popup-detail"><strong>Partido:</strong> ${partido}</div>
           <div class="health-popup-detail"><strong>Localidad:</strong> ${localidad}</div>
           <div class="health-popup-detail"><strong>Tipo:</strong> ${tipologia}</div>
@@ -297,40 +317,77 @@
     }
 
     // ==========================================
-    // SECCIÓN 3: CARGA DE CAPAS (A LA IZQUIERDA Y ORDENADAS)
+    // SECCIÓN 3: CARGA DE CAPAS Y CONTROL
     // ==========================================
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
     const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
     const urlTIFF  = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/UHI_Daytime_AOI.tif';
 
-    let inmatLayer, saludLayer, rasterLayer;
+    let inmatLayer, saludLayer, rasterLayer, loadedGeoraster;
 
-    // Control de capas ubicado a la IZQUIERDA
+    // Control de capas a la IZQUIERDA
     const layerControl = L.control.layers(baseMaps, {}, { 
       position: 'topleft', 
       collapsed: false 
     }).addTo(map);
 
+    // Función para reordenar el panel (Capas temáticas arriba, capas base abajo) y agregar el título "Capas"
+    function setupLayerControlLayout() {
+      const container = layerControl.getContainer();
+      if (!container) return;
+
+      // Insertar Título "Capas"
+      if (!container.querySelector('.leaflet-control-layers-title')) {
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'leaflet-control-layers-title';
+        titleDiv.innerHTML = 'Capas';
+        container.insertBefore(titleDiv, container.firstChild);
+      }
+
+      const baseForm = container.querySelector('.leaflet-control-layers-base');
+      const overlaysForm = container.querySelector('.leaflet-control-layers-overlays');
+
+      if (baseForm && overlaysForm) {
+        // Invertir orden
+        container.appendChild(overlaysForm);
+        
+        // Agregar subtítulo a mapas base
+        if (!container.querySelector('.leaflet-control-layers-group-title')) {
+          const baseTitle = document.createElement('div');
+          baseTitle.className = 'leaflet-control-layers-group-title';
+          baseTitle.innerHTML = 'Mapa Base';
+          container.appendChild(baseTitle);
+        }
+        
+        container.appendChild(baseForm);
+      }
+    }
+
     function fetchGeoJSON(url) {
       return fetch(url).then(res => {
-        if (!res.ok) throw new Error(`Error ${res.status} al cargar ${url}`);
+        if (!res.ok) throw new Error(`Error ${res.status} al cargar${url}`);
         return res.json();
       });
     }
 
-    // Interpolación continua para "Spectral"
-    function getSpectralColor(val, minVal = 0, maxVal = 10) {
+    // Estadísticas ajustadas con tus datos exactos
+    const STATS = {
+      min: -3.8112701654569,
+      max: 3.0402572120321
+    };
+
+    function getSpectralColor(val, minVal = STATS.min, maxVal = STATS.max) {
       let t = (val - minVal) / (maxVal - minVal);
       if (t < 0) t = 0;
       if (t > 1) t = 1;
 
       const colors = [
-        [43, 131, 186],
-        [171, 221, 164],
-        [255, 255, 191],
-        [253, 174, 97],
-        [215, 25, 28]
+        [43, 131, 186],   // Azul
+        [171, 221, 164],  // Verde
+        [255, 255, 191],  // Amarillo
+        [253, 174, 97],   // Naranja
+        [215, 25, 28]     // Rojo
       ];
 
       const numIntervals = colors.length - 1;
@@ -350,10 +407,9 @@
       return `rgb(${r},${g},${b})`;
     }
 
-    // 1. Cargar GeoTIFF primero o traerlo al frente para asegurar que esté por encima por defecto
+    // Cargar GeoTIFF
     parseGeoraster(urlTIFF).then(georaster => {
-      const minVal = georaster.mins ? georaster.mins[0] : 0;
-      const maxVal = georaster.maxs ? georaster.maxs[0] : 10;
+      loadedGeoraster = georaster;
 
       rasterLayer = new GeoRasterLayer({
         georaster: georaster,
@@ -362,17 +418,18 @@
         pixelValuesToColorFn: values => {
           const val = values[0];
           if (val === null || isNaN(val) || val === georaster.noDataValue) return null;
-          return getSpectralColor(val, minVal, maxVal);
+          return getSpectralColor(val, STATS.min, STATS.max);
         }
       });
 
       rasterLayer.addTo(map);
-      rasterLayer.bringToFront(); // Garantiza que aparezca arriba por defecto
-      layerControl.addOverlay(rasterLayer, "🌡️ Intensidad Isla de Calor (UHI)");
-
+      rasterLayer.bringToFront();
+      layerControl.addOverlay(rasterLayer, "Intensidad Isla de Calor (UHI)");
+      
+      setupLayerControlLayout();
     }).catch(err => console.error('Error al cargar el GeoTIFF UHI:', err));
 
-    // 2. Cargar GeoJSONs
+    // Cargar GeoJSONs
     Promise.all([fetchGeoJSON(urlINMAT), fetchGeoJSON(urlSalud)])
       .then(([dataINMAT, dataSalud]) => {
         
@@ -388,13 +445,51 @@
           onEachFeature: onEachFeatureSalud
         }).addTo(map);
 
-        layerControl.addOverlay(inmatLayer, "🏚️ Radios Censales (INMAT IV)");
-        layerControl.addOverlay(saludLayer, "🏥 Salud (por Financiamiento)");
+        layerControl.addOverlay(inmatLayer, "Radios Censales (INMAT IV)");
+        layerControl.addOverlay(saludLayer, "Establecimientos de Salud");
+
+        setupLayerControlLayout();
       })
       .catch(err => console.error('Error cargando los GeoJSON:', err));
 
     // ==========================================
-    // SECCIÓN 4: LEYENDA Y AUTORÍA (A LA DERECHA)
+    // SECCIÓN 4: POPUP AL HACER CLIC EN EL RASTER (ICU)
+    // ==========================================
+
+    map.on('click', function (e) {
+      // Verificar si la capa raster está activa e informada
+      if (!loadedGeoraster || !map.hasLayer(rasterLayer)) return;
+
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+
+      // Obtener las coordenadas del raster a partir del clic
+      const georaster = loadedGeoraster;
+      const x = Math.floor((lng - georaster.xmin) / georaster.pixelWidth);
+      const y = Math.floor((georaster.ymax - lat) / georaster.pixelHeight);
+
+      if (x >= 0 && x < georaster.width && y >= 0 && y < georaster.height) {
+        const val = georaster.values[0][y][x];
+
+        if (val !== null && !isNaN(val) && val !== georaster.noDataValue) {
+          L.popup()
+            .setLatLng(e.latlng)
+            .setContent(`
+              <div style="font-family: Arial, sans-serif; min-width: 160px; text-align: center;">
+                <div style="font-size: 11px; color: #718096; font-weight: bold;">ISLA DE CALOR (UHI)</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2b6cb0; margin: 4px 0;">
+                  ${val.toFixed(2)} °C
+                </div>
+                <div style="font-size: 10px; color: #a0aec0;">Intensidad de Temperatura Superficial</div>
+              </div>
+            `)
+            .openOn(map);
+        }
+      }
+    });
+
+    // ==========================================
+    // SECCIÓN 5: LEYENDA Y AUTORÍA
     // ==========================================
 
     const legend = L.control({ position: 'bottomright' });
@@ -402,76 +497,16 @@
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
 
-      // Título principal y autoría
       let html = `
         <div class="main-title">Vulnerabilidad Socio-Ambiental e Isla de Calor Urbana</div>
         <div class="author-tag">Desarrollado por Paula Segovia</div>
       `;
 
-      // 1. UHI (Escala Continua Spectral)
+      // 1. UHI
       html += `
         <div class="legend-title" style="margin-top:2px;">Intensidad Isla de Calor (RMBA)</div>
         <div class="continuous-bar"></div>
         <div class="continuous-labels">
-          <span>Baja (Azul)</span>
-          <span>Media (Amarillo)</span>
-          <span>Alta (Rojo)</span>
-        </div>
-      `;
-
-      // 2. Salud
-      const saludCategorias = [
-        { nombre: 'Municipal', color: '#1f78b4' },
-        { nombre: 'Provincial', color: '#e31a1c' },
-        { nombre: 'Nacional', color: '#33a02c' },
-        { nombre: 'Privado', color: '#fb9a99' },
-        { nombre: 'Seguridad social', color: '#fdbf6f' },
-        { nombre: 'Mutual', color: '#b2df8a' },
-        { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
-        { nombre: 'Servicio Penitenciario Fed.', color: '#ff7f00' },
-        { nombre: 'Servicio Penitenciario Prov.', color: '#cab2d6' },
-        { nombre: 'Universitario público', color: '#6a3d9a' }
-      ];
-
-      html += `<div class="legend-title">Establecimientos de Salud</div><div class="legend-scale">`;
-      saludCategorias.forEach(cat => {
-        html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
-      });
-      html += `</div>`;
-
-      // 3. INMAT IV
-      html += `<div class="legend-title">Hogares con INMAT IV (Precaria)</div><div class="legend-scale">`;
-      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
-      for (let i = 0; i < breaks.length - 1; i++) {
-        html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
-      }
-      html += `</div>`;
-
-      // Detalles y Fuentes
-      html += `
-        <details class="legend-details">
-          <summary>Ver definiciones INMAT</summary>
-          <div>
-            <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
-            <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
-            <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
-            <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
-          </div>
-        </details>
-
-        <div class="legend-source">
-          <strong>Cita UHI:</strong> Chakraborty, T., & Lee, X. (2019). <em>A simplified urban-extent algorithm to characterize surface urban heat islands on a global scale and examine vegetation control on their spatiotemporal variability</em>. Int. J. Appl. Earth Obs. Geoinf., 74, 269-280.
-        </div>
-        <div class="legend-source" style="border-top: none; padding-top: 2px;">
-          <strong>Fuentes:</strong> Censo 2022 (INDEC) & REFES (Min. Salud)
-        </div>
-      `;
-
-      div.innerHTML = html;
-      return div;
-    };
-
-    legend.addTo(map);
-  </script>
-</body>
-</html>
+          <span>${STATS.min.toFixed(1)}°C (Baja)</span>
+          <span>0°C</span>
+          <span>+${STATS.max.toFixed(1)}°C (
