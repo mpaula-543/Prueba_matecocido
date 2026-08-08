@@ -366,7 +366,7 @@
 
     function fetchGeoJSON(url) {
       return fetch(url).then(res => {
-        if (!res.ok) throw new Error(`Error ${res.status} al cargar${url}`);
+        if (!res.ok) throw new Error(`Error ${res.status} al cargar ${url}`);
         return res.json();
       });
     }
@@ -509,4 +509,63 @@
         <div class="continuous-labels">
           <span>${STATS.min.toFixed(1)}°C (Baja)</span>
           <span>0°C</span>
-          <span>+${STATS.max.toFixed(1)}°C (
+          <span>+${STATS.max.toFixed(1)}°C (Alta)</span>
+        </div>
+      `;
+
+      // 2. Salud
+      const saludCategorias = [
+        { nombre: 'Municipal', color: '#1f78b4' },
+        { nombre: 'Provincial', color: '#e31a1c' },
+        { nombre: 'Nacional', color: '#33a02c' },
+        { nombre: 'Privado', color: '#fb9a99' },
+        { nombre: 'Seguridad social', color: '#fdbf6f' },
+        { nombre: 'Mutual', color: '#b2df8a' },
+        { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
+        { nombre: 'Servicio Penitenciario Fed.', color: '#ff7f00' },
+        { nombre: 'Servicio Penitenciario Prov.', color: '#cab2d6' },
+        { nombre: 'Universitario público', color: '#6a3d9a' }
+      ];
+
+      html += `<div class="legend-title">Establecimientos de Salud</div><div class="legend-scale">`;
+      saludCategorias.forEach(cat => {
+        html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
+      });
+      html += `</div>`;
+
+      // 3. INMAT IV
+      html += `<div class="legend-title">Hogares con INMAT IV (Precaria)</div><div class="legend-scale">`;
+      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+      for (let i = 0; i < breaks.length - 1; i++) {
+        html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
+      }
+      html += `</div>`;
+
+      // Detalles y Fuentes
+      html += `
+        <details class="legend-details">
+          <summary>Ver definiciones INMAT</summary>
+          <div>
+            <p><strong>Calidad 1:</strong> Materiales resistentes de buena calidad.</p>
+            <p><strong>Calidad 2:</strong> Carencia menor en aislación o finos.</p>
+            <p><strong>Calidad 3:</strong> Deficitario en al menos un componente.</p>
+            <p><strong>Calidad 4:</strong> Materiales no resistentes / precarios.</p>
+          </div>
+        </details>
+
+        <div class="legend-source">
+          <strong>Cita UHI:</strong> Chakraborty, T., & Lee, X. (2019). <em>A simplified urban-extent algorithm to characterize surface urban heat islands on a global scale and examine vegetation control on their spatiotemporal variability</em>. Int. J. Appl. Earth Obs. Geoinf., 74, 269-280.
+        </div>
+        <div class="legend-source" style="border-top: none; padding-top: 2px;">
+          <strong>Fuentes:</strong> Censo 2022 (INDEC) & REFES (Min. Salud)
+        </div>
+      `;
+
+      div.innerHTML = html;
+      return div;
+    };
+
+    legend.addTo(map);
+  </script>
+</body>
+</html>
