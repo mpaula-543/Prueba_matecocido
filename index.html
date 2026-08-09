@@ -9,7 +9,7 @@
   
   <style>
     body { margin: 0; padding: 0; }
-    #map { width: 100vw; height: 100vh; }
+    #map { width: 100vw; height: 100vh; background-color: #e5e3df; }
     
     /* Personalización del Selector de Capas */
     .leaflet-control-layers-title {
@@ -21,16 +21,6 @@
       padding-bottom: 3px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-    }
-
-    .leaflet-control-layers-group-title {
-      font-weight: bold;
-      font-size: 10.5px;
-      color: #4a5568;
-      margin-top: 8px;
-      margin-bottom: 4px;
-      border-top: 1px solid #edf2f7;
-      padding-top: 4px;
     }
 
     /* Estilos del recuadro de las leyendas */
@@ -175,7 +165,7 @@
 
   <script>
     // ==========================================
-    // SECCIÓN 0: CAPAS BASE
+    // SECCIÓN 0: CAPAS BASE E INICIALIZACIÓN
     // ==========================================
 
     const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
@@ -207,15 +197,22 @@
       "OpenStreetMap": osm
     };
 
+    // Control de capas a la izquierda
+    const layerControl = L.control.layers(baseMaps, {}, { 
+      position: 'topleft', 
+      collapsed: false 
+    }).addTo(map);
+
     function fmt(val) {
       if (val === undefined || val === null || isNaN(val)) return 'S/D';
       return Number(val).toFixed(2) + '%';
     }
 
     // ==========================================
-    // SECCIÓN 1: CAPA INMAT (RADIOS CENSALES)
+    // SECCIÓN 1: FUNCIONES DE ESTILO Y POPUPS
     // ==========================================
 
+    // Color INMAT IV
     function getColorINMAT(d) {
       return d > 33.3 ? '#4a148c' :
              d > 11.5 ? '#7b1fa2' :
@@ -237,7 +234,7 @@
       if (!p) return;
 
       const partido = p.DPTO || 'Sin Municipio';
-      const codigo  = p.REDCODE || 'S/D';
+      const codigo  = p.REDCODE || p.Código || 'S/D';
 
       const popupContent = `
         <div style="font-family: Arial, sans-serif; min-width: 200px;">
@@ -262,11 +259,7 @@
       layer.bindPopup(popupContent);
     }
 
-    // ==========================================
-    // SECCIÓN 1B: CAPA NBI VIVIENDA INCONVENIENTE (RADIOS CENSALES)
-    // ==========================================
-
-    // Escala con quiebres naturales (Blanco a Fucsia)
+    // Color NBI Vivienda Inconveniente (Blanco a Fucsia)
     function getColorNBI(d) {
       return d > 20.0 ? '#880e4f' :
              d > 10.0 ? '#c2185b' :
@@ -309,10 +302,7 @@
       layer.bindPopup(popupContent);
     }
 
-    // ==========================================
-    // SECCIÓN 2: CAPA DE SALUD (PUNTOS)
-    // ==========================================
-
+    // Color Salud
     function getSaludColor(origen) {
       switch (origen) {
         case 'FFAA/Seguridad':                       return '#a6cee3';
@@ -331,12 +321,12 @@
 
     function pointToLayerSalud(feature, latlng) {
       return L.circleMarker(latlng, {
-        radius: 2.5,
+        radius: 3,
         fillColor: getSaludColor(feature.properties.origen_financiamiento),
         color: '#ffffff',
-        weight: 0.4,
+        weight: 0.5,
         opacity: 1,
-        fillOpacity: 0.9
+        fillOpacity: 0.95
       });
     }
 
@@ -365,38 +355,44 @@
       layer.bindPopup(popupContent);
     }
 
+    // Gradiente térmico para GeoTIFF
+    const STATS = { min: -3.81127, max: 3.04025 };
+
+    function getSpectralColor(val, minVal = STATS.min, maxVal = STATS.max) {
+      let t = (val - minVal) / (maxVal - minVal);
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+
+      const colors = [
+        [43, 131, 186],   // Azul
+        [171, 221, 164],  // Verde
+        [255, 255, 191],  // Amarillo
+        [253, 174, 97],   // Naranja
+        [215, 25, 28]     // Rojo
+      ];
+
+      const numIntervals = colors.length - 1;
+      const scaledT = t * numIntervals;
+      const index = Math.floor(scaledT);
+      const frac = scaledT - index;
+
+      if (index >= numIntervals) return `rgb(${colors[numIntervals].join(',')})`;
+
+      const c1 = colors[index];
+      const c2 = colors[index + 1];
+
+      const r = Math.round(c1[0] + frac * (c2[0] - c1[0]));
+      const g = Math.round(c1[1] + frac * (c2[1] - c1[1]));
+      const b = Math.round(c1[2] + frac * (c2[2] - c1[2]));
+
+      return `rgb(${r},${g},${b})`;
+    }
+
     // ==========================================
-    // SECCIÓN 3: CARGA DE CAPAS Y CONTROL
+    // SECCIÓN 2: CARGA INDEPENDIENTE DE CAPAS
     // ==========================================
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
     const urlNBI   = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/F_NBI_vivinconv.geojson';
     const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
-    const urlTIFF  = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/UHI_Daytime_AOI.tif';
-
-    let inmatLayer, nbiLayer, saludLayer, rasterLayer, loadedGeoraster;
-
-    // Control de capas a la IZQUIERDA
-    const layerControl = L.control.layers(baseMaps, {}, { 
-      position: 'topleft', 
-      collapsed: false 
-    }).addTo(map);
-
-    function setupLayerControlLayout() {
-      const container = layerControl.getContainer();
-      if (!container) return;
-
-      if (!container.querySelector('.leaflet-control-layers-title')) {
-        const titleDiv = document.createElement('div');
-        titleDiv.className = 'leaflet-control-layers-title';
-        titleDiv.innerHTML = 'Capas';
-        container.insertBefore(titleDiv, container.firstChild);
-      }
-
-      const baseForm = container.querySelector('.leaflet-control-layers-base');
-      const overlaysForm = container.querySelector('.leaflet-control-layers-overlays');
-
-      if (baseForm && overlaysForm) {
-        container.appendChild(overlaysForm);
-        
-        if (!container.querySelector('.leaflet-control-layers-group-title')) {
+    const urlTIFF  = 'https://raw.githubusercontent.com/mpaula
