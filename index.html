@@ -12,6 +12,26 @@
     #map { width: 100vw; height: 100vh; }
     
     /* Personalización del Selector de Capas */
+    .leaflet-control-layers {
+      width: 230px;
+      max-width: 230px;
+      font-size: 10.5px;
+    }
+
+    .leaflet-control-layers label {
+      display: flex;
+      align-items: flex-start;
+      gap: 5px;
+      line-height: 1.25;
+      margin-bottom: 3px;
+    }
+
+    .leaflet-control-layers label span {
+      white-space: normal;
+      overflow-wrap: break-word;
+      word-break: normal;
+    }
+
     .leaflet-control-layers-title {
       font-weight: bold;
       font-size: 11px;
@@ -25,12 +45,14 @@
 
     .leaflet-control-layers-group-title {
       font-weight: bold;
-      font-size: 10.5px;
+      font-size: 10px;
       color: #4a5568;
-      margin-top: 8px;
-      margin-bottom: 4px;
-      border-top: 1px solid #edf2f7;
-      padding-top: 4px;
+      margin-top: 10px;
+      margin-bottom: 5px;
+      border-top: 1px solid #cbd5e0;
+      padding-top: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
     }
 
     /* Estilos del recuadro de las leyendas */
@@ -218,10 +240,9 @@
 
     function getColorINMAT(d) {
       return d > 33.3 ? '#4a148c' :
-             d > 11.5 ? '#7b1fa2' :
-             d > 4.4  ? '#ab47bc' :
-             d > 1.5  ? '#ce93d8' :
-                        '#f3e5f5';
+             d > 8.8  ? '#7b1fa2' :
+             d > 2.3  ? '#ab47bc' :
+                        '#ce93d8';
     }
 
     function styleINMAT(feature) {
@@ -263,29 +284,63 @@
     }
 
     // ==========================================
-    // SECCIÓN 2: CAPA DE SALUD (PUNTOS)
+    // SECCIÓN 2: CAPA NBI - VIVIENDA INCONVENIENTE
     // ==========================================
 
-    function getSaludColor(origen) {
-      switch (origen) {
-        case 'FFAA/Seguridad':                       return '#a6cee3';
-        case 'Municipal':                            return '#1f78b4';
-        case 'Mutual':                               return '#b2df8a';
-        case 'Nacional':                             return '#33a02c';
-        case 'Privado':                              return '#fb9a99';
-        case 'Provincial':                           return '#e31a1c';
-        case 'Seguridad social':                     return '#fdbf6f';
-        case 'Servicio Penitenciario Federal':        return '#ff7f00';
-        case 'Servicio Penitenciario Provincial':     return '#cab2d6';
-        case 'Universitario público':                return '#6a3d9a';
-        default:                                     return '#718096';
-      }
+    function getColorNBI(d) {
+      return d > 40   ? '#99000d' :
+             d > 13.2 ? '#d7301f' :
+             d > 4    ? '#fc8d59' :
+                        '#fee0d2';
+    }
+
+    function styleNBI(feature) {
+      return {
+        fillColor: getColorNBI(feature.properties.pc_viv_si || 0),
+        stroke: false,
+        fillOpacity: 0.75
+      };
+    }
+
+    function onEachFeatureNBI(feature, layer) {
+      const p = feature.properties;
+      if (!p) return;
+
+      const partido = p.DPTO || 'Sin Municipio';
+      const codigo = p.REDCODE || 'S/D';
+
+      const popupContent = `
+        <div style="font-family: Arial, sans-serif; min-width: 200px;">
+          <div style="font-size: 10px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
+            Partido: ${partido}
+          </div>
+          <div style="font-weight: bold; font-size: 12px; color: #2d3748; margin-bottom: 4px; border-bottom: 2px solid #3182ce; padding-bottom: 2px;">
+            Radio Censal: ${codigo}
+          </div>
+          <table class="popup-table">
+            <tr>
+              <td><strong>Vivienda inconveniente:</strong></td>
+              <td style="text-align: right;">${fmt(p.pc_viv_si)}</td>
+            </tr>
+          </table>
+        </div>
+      `;
+
+      layer.bindPopup(popupContent);
+    }
+
+    // ==========================================
+    // SECCIÓN 3: CAPA DE SALUD (PUNTOS)
+    // ==========================================
+
+    function getSaludColor() {
+      return '#9ACDB2';
     }
 
     function pointToLayerSalud(feature, latlng) {
       return L.circleMarker(latlng, {
         radius: 2.5,
-        fillColor: getSaludColor(feature.properties.origen_financiamiento),
+        fillColor: getSaludColor(),
         color: '#ffffff',
         weight: 0.4,
         opacity: 1,
@@ -301,18 +356,12 @@
       const partido        = p.departamento_nombre || 'S/D';
       const localidad      = p.localidad_nombre || 'S/D';
       const tipologia      = p.tipologia_nombre || 'S/D';
-      const financiamiento = p.origen_financiamiento || 'Sin Datos';
-
       const popupContent = `
         <div style="font-family: Arial, sans-serif; min-width: 210px;">
           <div class="health-popup-title">${nombre}</div>
           <div class="health-popup-detail"><strong>Partido:</strong> ${partido}</div>
           <div class="health-popup-detail"><strong>Localidad:</strong> ${localidad}</div>
           <div class="health-popup-detail"><strong>Tipo:</strong> ${tipologia}</div>
-          <div class="health-popup-detail" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
-            <strong>Financiamiento:</strong> 
-            <span style="color: ${getSaludColor(financiamiento)}; font-weight: bold;">${financiamiento}</span>
-          </div>
         </div>
       `;
       layer.bindPopup(popupContent);
@@ -324,9 +373,10 @@
 
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
     const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
+    const urlNBI   = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/F_NBI_vivinconv.geojson';
     const urlTIFF  = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/UHI_Daytime_AOI.tif';
 
-    let inmatLayer, saludLayer, rasterLayer, loadedGeoraster;
+    let inmatLayer, nbiLayer, saludLayer, rasterLayer, loadedGeoraster;
 
     // Control de capas a la IZQUIERDA
     const layerControl = L.control.layers(baseMaps, {}, { 
@@ -342,7 +392,7 @@
       if (!container.querySelector('.leaflet-control-layers-title')) {
         const titleDiv = document.createElement('div');
         titleDiv.className = 'leaflet-control-layers-title';
-        titleDiv.innerHTML = 'Capas';
+        titleDiv.innerHTML = 'Capas temáticas';
         container.insertBefore(titleDiv, container.firstChild);
       }
 
@@ -356,7 +406,7 @@
         if (!container.querySelector('.leaflet-control-layers-group-title')) {
           const baseTitle = document.createElement('div');
           baseTitle.className = 'leaflet-control-layers-group-title';
-          baseTitle.innerHTML = 'Mapa Base';
+          baseTitle.innerHTML = 'Mapas base';
           container.appendChild(baseTitle);
         }
         
@@ -441,16 +491,31 @@
       layerControl.addOverlay(inmatLayer, "Calidad de los materiales de las viviendas - Calidad IV (INMAT IV) por radio censal");
       setupLayerControlLayout();
 
+      return fetchGeoJSON(urlNBI);
+    }).then(dataNBI => {
+
+      // 3° en el orden: NBI - Vivienda inconveniente
+      nbiLayer = L.geoJSON(dataNBI, {
+        style: styleNBI,
+        onEachFeature: onEachFeatureNBI
+      }).addTo(map);
+
+      layerControl.addOverlay(
+        nbiLayer,
+        "NBI - Vivienda inconveniente por radio censal"
+      );
+      setupLayerControlLayout();
+
       return fetchGeoJSON(urlSalud);
     }).then(dataSalud => {
 
-      // 3° en el orden: Salud
+      // 4° en el orden: Salud
       saludLayer = L.geoJSON(dataSalud, {
         pointToLayer: pointToLayerSalud,
         onEachFeature: onEachFeatureSalud
       }).addTo(map);
 
-      layerControl.addOverlay(saludLayer, "Establecimientos de salud por financiamiento");
+      layerControl.addOverlay(saludLayer, "Establecimientos de salud");
       setupLayerControlLayout();
 
     }).catch(err => console.error('Error cargando las capas:', err));
@@ -516,30 +581,24 @@
 
       // 2. INMAT IV por radio censal
       html += `<div class="legend-title">Calidad de los materiales de las viviendas - Calidad IV (INMAT IV) por radio censal</div><div class="legend-scale">`;
-      const breaks = [0, 1.5, 4.4, 11.5, 33.3, 71.4];
+      const breaks = [0, 2.3, 8.8, 33.3, 71.4];
       for (let i = 0; i < breaks.length - 1; i++) {
         html += `<div><i style="background:${getColorINMAT(breaks[i] + 0.01)}"></i> ${breaks[i]}% &ndash; ${breaks[i + 1]}%</div>`;
       }
       html += `</div>`;
 
-      // 3. Salud por financiamiento
-      const saludCategorias = [
-        { nombre: 'Municipal', color: '#1f78b4' },
-        { nombre: 'Provincial', color: '#e31a1c' },
-        { nombre: 'Nacional', color: '#33a02c' },
-        { nombre: 'Privado', color: '#fb9a99' },
-        { nombre: 'Seguridad social', color: '#fdbf6f' },
-        { nombre: 'Mutual', color: '#b2df8a' },
-        { nombre: 'FFAA/Seguridad', color: '#a6cee3' },
-        { nombre: 'Servicio Penitenciario Fed.', color: '#ff7f00' },
-        { nombre: 'Servicio Penitenciario Prov.', color: '#cab2d6' },
-        { nombre: 'Universitario público', color: '#6a3d9a' }
-      ];
+      // 3. NBI - Vivienda inconveniente
+      html += `<div class="legend-title">NBI - Vivienda inconveniente por radio censal</div><div class="legend-scale">`;
+      const breaksNBI = [0, 4, 13.2, 40, 100];
 
-      html += `<div class="legend-title">Establecimientos de salud por financiamiento</div><div class="legend-scale">`;
-      saludCategorias.forEach(cat => {
-        html += `<div><i class="circle" style="background:${cat.color};"></i> ${cat.nombre}</div>`;
-      });
+      for (let i = 0; i < breaksNBI.length - 1; i++) {
+        html += `<div><i style="background:${getColorNBI(breaksNBI[i] + 0.01)}"></i> ${breaksNBI[i]}% &ndash; ${breaksNBI[i + 1]}%</div>`;
+      }
+      html += `</div>`;
+
+      // 5. Establecimientos de salud
+      html += `<div class="legend-title">Establecimientos de salud</div><div class="legend-scale">`;
+      html += `<div><i class="circle" style="background:#9ACDB2;"></i> Establecimiento de salud</div>`;
       html += `</div>`;
 
       // Detalles y Fuentes
