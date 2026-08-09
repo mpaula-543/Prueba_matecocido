@@ -16,6 +16,29 @@
       background-color: #e5e3df;
     }
     
+    /* Personalización del Selector de Capas */
+    .leaflet-control-layers-title {
+      font-weight: bold;
+      font-size: 11px;
+      color: #2d3748;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .leaflet-control-layers-group-title {
+      font-weight: bold;
+      font-size: 10.5px;
+      color: #4a5568;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      border-top: 1px solid #edf2f7;
+      padding-top: 4px;
+    }
+
+    /* Estilos del recuadro de las leyendas */
     .info.legend {
       background: rgba(255, 255, 255, 0.95);
       padding: 10px 14px;
@@ -24,7 +47,7 @@
       border-radius: 8px;
       font-family: Arial, sans-serif;
       font-size: 11px;
-      max-width: 310px;
+      max-width: 320px;
       line-height: 1.35;
       margin-bottom: 10px;
       max-height: 80vh;
@@ -127,6 +150,22 @@
       padding: 2px 4px;
       border-bottom: 1px solid #eee;
     }
+
+    .health-popup-title {
+      font-weight: bold;
+      font-size: 13px;
+      color: #2b6cb0;
+      margin-bottom: 4px;
+      border-bottom: 2px solid #3182ce;
+      padding-bottom: 3px;
+      line-height: 1.2;
+    }
+
+    .health-popup-detail {
+      font-size: 11px;
+      color: #2d3748;
+      margin: 3px 0;
+    }
   </style>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -138,15 +177,12 @@
   <div id="map"></div>
 
   <script>
-    // 1. INICIALIZAR MAPA
-    const map = L.map('map').setView([-34.6037, -58.3816], 10);
-
-    // 2. MAPAS BASE
+    // 1. MAPA Y MAPAS BASE
     const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '&copy; Google Maps'
-    }).addTo(map);
+    });
 
     const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       maxZoom: 20,
@@ -157,6 +193,12 @@
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
+    });
+
+    const map = L.map('map', {
+      center: [-34.6037, -58.3816],
+      zoom: 10,
+      layers: [googleSat]
     });
 
     const baseMaps = {
@@ -172,6 +214,9 @@
       return Number(val).toFixed(2) + '%';
     }
 
+    // 2. FUNCIONES DE COLOR
+
+    // A. INMAT IV
     function getColorINMAT(d) {
       return d > 33.3 ? '#4a148c' :
              d > 11.5 ? '#7b1fa2' :
@@ -180,24 +225,34 @@
                         '#f3e5f5';
     }
 
+    // B. NBI Vivienda Inconveniente (Fucsia)
+    function getColorNBI(d) {
+      return d > 20.0 ? '#880e4f' :
+             d > 10.0 ? '#c2185b' :
+             d > 5.0  ? '#e91e63' :
+             d > 2.0  ? '#f48fb1' :
+                        '#fce4ec';
+    }
+
+    // C. Salud por Financiamiento
     function getSaludColor(origen) {
       switch (origen) {
-        case 'FFAA/Seguridad':                       return '#a6cee3';
-        case 'Municipal':                            return '#1f78b4';
-        case 'Mutual':                               return '#b2df8a';
-        case 'Nacional':                             return '#33a02c';
-        case 'Privado':                              return '#fb9a99';
-        case 'Provincial':                           return '#e31a1c';
-        case 'Seguridad social':                     return '#fdbf6f';
-        case 'Servicio Penitenciario Federal':        return '#ff7f00';
-        case 'Servicio Penitenciario Provincial':     return '#cab2d6';
-        case 'Universitario público':                return '#6a3d9a';
-        default:                                     return '#718096';
+        case 'FFAA/Seguridad':                   return '#a6cee3';
+        case 'Municipal':                        return '#1f78b4';
+        case 'Mutual':                           return '#b2df8a';
+        case 'Nacional':                         return '#33a02c';
+        case 'Privado':                          return '#fb9a99';
+        case 'Provincial':                       return '#e31a1c';
+        case 'Seguridad social':                 return '#fdbf6f';
+        case 'Servicio Penitenciario Federal':    return '#ff7f00';
+        case 'Servicio Penitenciario Provincial': return '#cab2d6';
+        case 'Universitario público':            return '#6a3d9a';
+        default:                                 return '#718096';
       }
     }
 
+    // D. UHI Espectral
     const STATS = { min: -3.81127, max: 3.04025 };
-
     function getSpectralColor(val) {
       let t = (val - STATS.min) / (STATS.max - STATS.min);
       if (t < 0) t = 0; if (t > 1) t = 1;
@@ -211,14 +266,15 @@
       return `rgb(${Math.round(c1[0] + frac * (c2[0] - c1[0]))},${Math.round(c1[1] + frac * (c2[1] - c1[1]))},${Math.round(c1[2] + frac * (c2[2] - c1[2]))})`;
     }
 
-    // RUTAS
+    // 3. RUTAS DE DATOS EN GITHUB
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
+    const urlNBI   = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/F_NBI_vivinconv.geojson';
     const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
     const urlTIFF  = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/UHI_Daytime_AOI.tif';
 
     let saludLayer = null;
 
-    // A. CARGA INMAT
+    // --- CARGA CAPA 1: INMAT IV ---
     fetch(urlINMAT)
       .then(r => r.json())
       .then(data => {
@@ -227,50 +283,96 @@
           onEachFeature: (f, l) => {
             const p = f.properties || {};
             l.bindPopup(`
-              <div style="font-family: Arial; min-width: 180px;">
-                <b>Partido:</b> ${p.DPTO || 'S/D'}<br>
-                <b>Radio Censal:</b> ${p.REDCODE || p.Código || 'S/D'}<br><br>
-                <b>Calidad IV (Precaria):</b> ${fmt(p.pc_Cal_IV)}
+              <div style="font-family: Arial, sans-serif; min-width: 200px;">
+                <div style="font-size: 10px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
+                  Partido: ${p.DPTO || 'Sin Municipio'}
+                </div>
+                <div style="font-weight: bold; font-size: 12px; color: #2d3748; margin-bottom: 4px; border-bottom: 2px solid #3182ce; padding-bottom: 2px;">
+                  Radio Censal: ${p.REDCODE || p.Código || 'S/D'}
+                </div>
+                <table class="popup-table">
+                  <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
+                  <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
+                  <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
+                  <tr style="background-color: #fff5f5; font-weight: bold;">
+                    <td style="color: #c53030;">Calidad IV (Precaria):</td>
+                    <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
+                  </tr>
+                  <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
+                </table>
               </div>
             `);
           }
         }).addTo(map);
 
         map.fitBounds(inmatLayer.getBounds());
-        layerControl.addOverlay(inmatLayer, "Viviendas Precarias (INMAT IV)");
+        layerControl.addOverlay(inmatLayer, "Calidad de Materiales Vivienda (INMAT IV)");
       })
-      .catch(e => console.error("Error al cargar INMAT:", e));
+      .catch(e => console.error("Error INMAT:", e));
 
-    // B. CARGA SALUD
+    // --- CARGA CAPA 2: NBI VIVIENDA INCONVENIENTE ---
+    fetch(urlNBI)
+      .then(r => r.json())
+      .then(data => {
+        const nbiLayer = L.geoJSON(data, {
+          style: f => ({ fillColor: getColorNBI(f.properties.pc_viv_no || 0), stroke: false, fillOpacity: 0.85 }),
+          onEachFeature: (f, l) => {
+            const p = f.properties || {};
+            l.bindPopup(`
+              <div style="font-family: Arial, sans-serif; min-width: 190px;">
+                <div style="font-size: 10px; color: #880e4f; text-transform: uppercase; font-weight: bold;">
+                  NBI Vivienda Inconveniente
+                </div>
+                <div style="font-weight: bold; font-size: 12px; color: #2d3748; margin-bottom: 4px; border-bottom: 2px solid #e91e63; padding-bottom: 2px;">
+                  Radio Censal: ${p.Código || p.REDCODE || 'S/D'}
+                </div>
+                <div style="margin-top: 6px; font-size: 13px;">
+                  <strong>Porcentaje:</strong> <span style="color: #c2185b; font-weight: bold;">${fmt(p.pc_viv_no)}</span>
+                </div>
+              </div>
+            `);
+          }
+        });
+        layerControl.addOverlay(nbiLayer, "NBI Vivienda Inconveniente");
+      })
+      .catch(e => console.error("Error NBI:", e));
+
+    // --- CARGA CAPA 3: SALUD ---
     fetch(urlSalud)
       .then(r => r.json())
       .then(data => {
         saludLayer = L.geoJSON(data, {
           pointToLayer: (f, latlng) => L.circleMarker(latlng, {
-            radius: 3,
+            radius: 2.5,
             fillColor: getSaludColor(f.properties.origen_financiamiento),
             color: '#ffffff',
-            weight: 0.5,
-            fillOpacity: 0.95
+            weight: 0.4,
+            fillOpacity: 0.9
           }),
           onEachFeature: (f, l) => {
             const p = f.properties || {};
+            const fin = p.origen_financiamiento || 'Sin Datos';
             l.bindPopup(`
-              <div style="font-family: Arial; min-width: 180px;">
-                <b style="color: #2b6cb0;">${p.establecimiento_nombre || 'Establecimiento'}</b><br>
-                <b>Partido:</b> ${p.departamento_nombre || 'S/D'}<br>
-                <b>Financiamiento:</b> ${p.origen_financiamiento || 'S/D'}
+              <div style="font-family: Arial, sans-serif; min-width: 210px;">
+                <div class="health-popup-title">${p.establecimiento_nombre || 'Establecimiento'}</div>
+                <div class="health-popup-detail"><strong>Partido:</strong> ${p.departamento_nombre || 'S/D'}</div>
+                <div class="health-popup-detail"><strong>Localidad:</strong> ${p.localidad_nombre || 'S/D'}</div>
+                <div class="health-popup-detail"><strong>Tipo:</strong> ${p.tipologia_nombre || 'S/D'}</div>
+                <div class="health-popup-detail" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+                  <strong>Financiamiento:</strong> 
+                  <span style="color: ${getSaludColor(fin)}; font-weight: bold;">${fin}</span>
+                </div>
               </div>
             `);
           }
         }).addTo(map);
 
         saludLayer.bringToFront();
-        layerControl.addOverlay(saludLayer, "Establecimientos de Salud");
+        layerControl.addOverlay(saludLayer, "Establecimientos de Salud (REFES)");
       })
-      .catch(e => console.error("Error al cargar Salud:", e));
+      .catch(e => console.error("Error Salud:", e));
 
-    // C. CARGA GEOTIFF (UHI)
+    // --- CARGA CAPA 4: GEOTIFF (UHI) ---
     let loadedGeoraster = null, rasterLayer = null;
     fetch(urlTIFF)
       .then(r => r.arrayBuffer())
@@ -279,7 +381,7 @@
         loadedGeoraster = georaster;
         rasterLayer = new GeoRasterLayer({
           georaster: georaster,
-          opacity: 0.7,
+          opacity: 0.75,
           resolution: 256,
           pixelValuesToColorFn: values => {
             const val = values[0];
@@ -291,9 +393,9 @@
         layerControl.addOverlay(rasterLayer, "Intensidad Isla de Calor (UHI)");
         if (saludLayer) saludLayer.bringToFront();
       })
-      .catch(e => console.error("Error al cargar GeoTIFF:", e));
+      .catch(e => console.error("Error GeoTIFF:", e));
 
-    // POPUP RASTER
+    // 4. CLIC EN RASTER (VALOR UHI EN °C)
     map.on('click', function (e) {
       if (!loadedGeoraster || !rasterLayer || !map.hasLayer(rasterLayer)) return;
       const lat = e.latlng.lat, lng = e.latlng.lng;
@@ -307,46 +409,5 @@
           L.popup()
             .setLatLng(e.latlng)
             .setContent(`
-              <div style="font-family: Arial; text-align: center;">
-                <div style="font-size: 10px; color: #718096; font-weight: bold;">ISLA DE CALOR</div>
-                <div style="font-size: 16px; font-weight: bold; color: #2b6cb0;">${val.toFixed(2)} °C</div>
-              </div>
-            `)
-            .openOn(map);
-        }
-      }
-    });
-
-    // LEYENDA
-    const legend = L.control({ position: 'bottomright' });
-    legend.onAdd = function () {
-      const div = L.DomUtil.create('div', 'info legend');
-      div.innerHTML = `
-        <div class="main-title">Vulnerabilidad Socio-Ambiental e Isla de Calor Urbana</div>
-        <div class="author-tag">Desarrollado por Paula Segovia</div>
-        
-        <div class="legend-title">Intensidad Isla de Calor (UHI)</div>
-        <div class="continuous-bar"></div>
-        <div class="continuous-labels">
-          <span>${STATS.min.toFixed(1)}°C</span>
-          <span>0°C</span>
-          <span>+${STATS.max.toFixed(1)}°C</span>
-        </div>
-
-        <div class="legend-title">Materiales Precarios (INMAT IV)</div>
-        <div class="legend-scale">
-          <div><i style="background:#f3e5f5"></i> 0% &ndash; 1.5%</div>
-          <div><i style="background:#ce93d8"></i> 1.5% &ndash; 4.4%</div>
-          <div><i style="background:#ab47bc"></i> 4.4% &ndash; 11.5%</div>
-          <div><i style="background:#7b1fa2"></i> 11.5% &ndash; 33.3%</div>
-          <div><i style="background:#4a148c"></i> > 33.3%</div>
-        </div>
-
-        <div class="legend-source">Fuentes: Censo 2022 (INDEC) & REFES</div>
-      `;
-      return div;
-    };
-    legend.addTo(map);
-  </script>
-</body>
-</html>
+              <div style="font-family: Arial, sans-serif; text-align: center; min-width: 150px;">
+                <div style="font-size: 10px; color: #7
