@@ -8,22 +8,14 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   
   <style>
-    body { margin: 0; padding: 0; }
-    #map { width: 100vw; height: 100vh; background-color: #e5e3df; }
-    
-    /* Personalización del Selector de Capas */
-    .leaflet-control-layers-title {
-      font-weight: bold;
-      font-size: 11px;
-      color: #2d3748;
-      margin-bottom: 6px;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 3px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #e5e3df;
     }
-
-    /* Estilos del recuadro de las leyendas */
+    
     .info.legend {
       background: rgba(255, 255, 255, 0.95);
       padding: 10px 14px;
@@ -68,7 +60,6 @@
 
     .legend-scale { margin-bottom: 6px; }
 
-    /* Íconos referencias */
     .legend-scale i {
       width: 11px;
       height: 11px;
@@ -81,7 +72,6 @@
 
     .legend-scale i.circle { border-radius: 50%; }
 
-    /* Estilo para la barra continua de UHI */
     .continuous-bar {
       height: 14px;
       width: 100%;
@@ -137,22 +127,6 @@
       padding: 2px 4px;
       border-bottom: 1px solid #eee;
     }
-
-    .health-popup-title {
-      font-weight: bold;
-      font-size: 13px;
-      color: #2b6cb0;
-      margin-bottom: 4px;
-      border-bottom: 2px solid #3182ce;
-      padding-bottom: 3px;
-      line-height: 1.2;
-    }
-
-    .health-popup-detail {
-      font-size: 11px;
-      color: #2d3748;
-      margin: 3px 0;
-    }
   </style>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -164,15 +138,15 @@
   <div id="map"></div>
 
   <script>
-    // ==========================================
-    // SECCIÓN 0: CAPAS BASE E INICIALIZACIÓN
-    // ==========================================
+    // 1. INICIALIZAR MAPA
+    const map = L.map('map').setView([-34.6037, -58.3816], 10);
 
+    // 2. MAPAS BASE
     const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '&copy; Google Maps'
-    });
+    }).addTo(map);
 
     const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       maxZoom: 20,
@@ -182,13 +156,7 @@
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    });
-
-    const map = L.map('map', {
-      center: [-34.6037, -58.3816],
-      zoom: 10,
-      layers: [googleSat]
+      attribution: '&copy; OpenStreetMap'
     });
 
     const baseMaps = {
@@ -197,22 +165,13 @@
       "OpenStreetMap": osm
     };
 
-    // Control de capas a la izquierda
-    const layerControl = L.control.layers(baseMaps, {}, { 
-      position: 'topleft', 
-      collapsed: false 
-    }).addTo(map);
+    const layerControl = L.control.layers(baseMaps, {}, { position: 'topleft', collapsed: false }).addTo(map);
 
     function fmt(val) {
       if (val === undefined || val === null || isNaN(val)) return 'S/D';
       return Number(val).toFixed(2) + '%';
     }
 
-    // ==========================================
-    // SECCIÓN 1: FUNCIONES DE ESTILO Y POPUPS
-    // ==========================================
-
-    // Color INMAT IV
     function getColorINMAT(d) {
       return d > 33.3 ? '#4a148c' :
              d > 11.5 ? '#7b1fa2' :
@@ -221,88 +180,6 @@
                         '#f3e5f5';
     }
 
-    function styleINMAT(feature) {
-      return {
-        fillColor: getColorINMAT(feature.properties.pc_Cal_IV || 0),
-        stroke: false,
-        fillOpacity: 0.85
-      };
-    }
-
-    function onEachFeatureINMAT(feature, layer) {
-      const p = feature.properties;
-      if (!p) return;
-
-      const partido = p.DPTO || 'Sin Municipio';
-      const codigo  = p.REDCODE || p.Código || 'S/D';
-
-      const popupContent = `
-        <div style="font-family: Arial, sans-serif; min-width: 200px;">
-          <div style="font-size: 10px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
-            Partido: ${partido}
-          </div>
-          <div style="font-weight: bold; font-size: 12px; color: #2d3748; margin-bottom: 4px; border-bottom: 2px solid #3182ce; padding-bottom: 2px;">
-            Radio Censal: ${codigo}
-          </div>
-          <table class="popup-table">
-            <tr><td><strong>Calidad I (Buena):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_I)}</td></tr>
-            <tr><td><strong>Calidad II (Aceptable):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_II)}</td></tr>
-            <tr><td><strong>Calidad III (Deficiente):</strong></td><td style="text-align: right;">${fmt(p.pc_Cal_III)}</td></tr>
-            <tr style="background-color: #fff5f5; font-weight: bold;">
-              <td style="color: #c53030;">Calidad IV (Precaria):</td>
-              <td style="text-align: right; color: #c53030;">${fmt(p.pc_Cal_IV)}</td>
-            </tr>
-            <tr><td><span style="color: #718096;">Ignorado:</span></td><td style="text-align: right; color: #718096;">${fmt(p.pc_Ignorad)}</td></tr>
-          </table>
-        </div>
-      `;
-      layer.bindPopup(popupContent);
-    }
-
-    // Color NBI Vivienda Inconveniente (Blanco a Fucsia)
-    function getColorNBI(d) {
-      return d > 20.0 ? '#880e4f' :
-             d > 10.0 ? '#c2185b' :
-             d > 4.0  ? '#e91e63' :
-             d > 1.0  ? '#f48fb1' :
-                        '#fce4ec';
-    }
-
-    function styleNBI(feature) {
-      return {
-        fillColor: getColorNBI(feature.properties.pc_viv_no || 0),
-        stroke: false,
-        fillOpacity: 0.85
-      };
-    }
-
-    function onEachFeatureNBI(feature, layer) {
-      const p = feature.properties;
-      if (!p) return;
-
-      const partido = p.DPTO || 'Sin Municipio';
-      const codigo  = p.Código || p.REDCODE || 'S/D';
-
-      const popupContent = `
-        <div style="font-family: Arial, sans-serif; min-width: 200px;">
-          <div style="font-size: 10px; color: #4a5568; text-transform: uppercase; font-weight: bold;">
-            Partido: ${partido}
-          </div>
-          <div style="font-weight: bold; font-size: 12px; color: #2d3748; margin-bottom: 4px; border-bottom: 2px solid #e91e63; padding-bottom: 2px;">
-            Radio Censal: ${codigo}
-          </div>
-          <table class="popup-table">
-            <tr style="background-color: #fce4ec; font-weight: bold;">
-              <td style="color: #880e4f;">NBI Vivienda Inconveniente:</td>
-              <td style="text-align: right; color: #880e4f;">${fmt(p.pc_viv_no)}</td>
-            </tr>
-          </table>
-        </div>
-      `;
-      layer.bindPopup(popupContent);
-    }
-
-    // Color Salud
     function getSaludColor(origen) {
       switch (origen) {
         case 'FFAA/Seguridad':                       return '#a6cee3';
@@ -319,80 +196,157 @@
       }
     }
 
-    function pointToLayerSalud(feature, latlng) {
-      return L.circleMarker(latlng, {
-        radius: 3,
-        fillColor: getSaludColor(feature.properties.origen_financiamiento),
-        color: '#ffffff',
-        weight: 0.5,
-        opacity: 1,
-        fillOpacity: 0.95
-      });
-    }
-
-    function onEachFeatureSalud(feature, layer) {
-      const p = feature.properties;
-      if (!p) return;
-
-      const nombre         = p.establecimiento_nombre || 'Establecimiento de Salud';
-      const partido        = p.departamento_nombre || 'S/D';
-      const localidad      = p.localidad_nombre || 'S/D';
-      const tipologia      = p.tipologia_nombre || 'S/D';
-      const financiamiento = p.origen_financiamiento || 'Sin Datos';
-
-      const popupContent = `
-        <div style="font-family: Arial, sans-serif; min-width: 210px;">
-          <div class="health-popup-title">${nombre}</div>
-          <div class="health-popup-detail"><strong>Partido:</strong> ${partido}</div>
-          <div class="health-popup-detail"><strong>Localidad:</strong> ${localidad}</div>
-          <div class="health-popup-detail"><strong>Tipo:</strong> ${tipologia}</div>
-          <div class="health-popup-detail" style="margin-top: 4px; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
-            <strong>Financiamiento:</strong> 
-            <span style="color: ${getSaludColor(financiamiento)}; font-weight: bold;">${financiamiento}</span>
-          </div>
-        </div>
-      `;
-      layer.bindPopup(popupContent);
-    }
-
-    // Gradiente térmico para GeoTIFF
     const STATS = { min: -3.81127, max: 3.04025 };
 
-    function getSpectralColor(val, minVal = STATS.min, maxVal = STATS.max) {
-      let t = (val - minVal) / (maxVal - minVal);
-      if (t < 0) t = 0;
-      if (t > 1) t = 1;
-
-      const colors = [
-        [43, 131, 186],   // Azul
-        [171, 221, 164],  // Verde
-        [255, 255, 191],  // Amarillo
-        [253, 174, 97],   // Naranja
-        [215, 25, 28]     // Rojo
-      ];
-
+    function getSpectralColor(val) {
+      let t = (val - STATS.min) / (STATS.max - STATS.min);
+      if (t < 0) t = 0; if (t > 1) t = 1;
+      const colors = [[43, 131, 186], [171, 221, 164], [255, 255, 191], [253, 174, 97], [215, 25, 28]];
       const numIntervals = colors.length - 1;
       const scaledT = t * numIntervals;
       const index = Math.floor(scaledT);
       const frac = scaledT - index;
-
       if (index >= numIntervals) return `rgb(${colors[numIntervals].join(',')})`;
-
-      const c1 = colors[index];
-      const c2 = colors[index + 1];
-
-      const r = Math.round(c1[0] + frac * (c2[0] - c1[0]));
-      const g = Math.round(c1[1] + frac * (c2[1] - c1[1]));
-      const b = Math.round(c1[2] + frac * (c2[2] - c1[2]));
-
-      return `rgb(${r},${g},${b})`;
+      const c1 = colors[index], c2 = colors[index + 1];
+      return `rgb(${Math.round(c1[0] + frac * (c2[0] - c1[0]))},${Math.round(c1[1] + frac * (c2[1] - c1[1]))},${Math.round(c1[2] + frac * (c2[2] - c1[2]))})`;
     }
 
-    // ==========================================
-    // SECCIÓN 2: CARGA INDEPENDIENTE DE CAPAS
-    // ==========================================
-
+    // RUTAS
     const urlINMAT = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/A_Inmat.geojson';
-    const urlNBI   = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/F_NBI_vivinconv.geojson';
     const urlSalud = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/Estab_salud_refes_filt.geojson';
-    const urlTIFF  = 'https://raw.githubusercontent.com/mpaula
+    const urlTIFF  = 'https://raw.githubusercontent.com/mpaula-543/Prueba_matecocido/main/UHI_Daytime_AOI.tif';
+
+    let saludLayer = null;
+
+    // A. CARGA INMAT
+    fetch(urlINMAT)
+      .then(r => r.json())
+      .then(data => {
+        const inmatLayer = L.geoJSON(data, {
+          style: f => ({ fillColor: getColorINMAT(f.properties.pc_Cal_IV || 0), stroke: false, fillOpacity: 0.85 }),
+          onEachFeature: (f, l) => {
+            const p = f.properties || {};
+            l.bindPopup(`
+              <div style="font-family: Arial; min-width: 180px;">
+                <b>Partido:</b> ${p.DPTO || 'S/D'}<br>
+                <b>Radio Censal:</b> ${p.REDCODE || p.Código || 'S/D'}<br><br>
+                <b>Calidad IV (Precaria):</b> ${fmt(p.pc_Cal_IV)}
+              </div>
+            `);
+          }
+        }).addTo(map);
+
+        map.fitBounds(inmatLayer.getBounds());
+        layerControl.addOverlay(inmatLayer, "Viviendas Precarias (INMAT IV)");
+      })
+      .catch(e => console.error("Error al cargar INMAT:", e));
+
+    // B. CARGA SALUD
+    fetch(urlSalud)
+      .then(r => r.json())
+      .then(data => {
+        saludLayer = L.geoJSON(data, {
+          pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+            radius: 3,
+            fillColor: getSaludColor(f.properties.origen_financiamiento),
+            color: '#ffffff',
+            weight: 0.5,
+            fillOpacity: 0.95
+          }),
+          onEachFeature: (f, l) => {
+            const p = f.properties || {};
+            l.bindPopup(`
+              <div style="font-family: Arial; min-width: 180px;">
+                <b style="color: #2b6cb0;">${p.establecimiento_nombre || 'Establecimiento'}</b><br>
+                <b>Partido:</b> ${p.departamento_nombre || 'S/D'}<br>
+                <b>Financiamiento:</b> ${p.origen_financiamiento || 'S/D'}
+              </div>
+            `);
+          }
+        }).addTo(map);
+
+        saludLayer.bringToFront();
+        layerControl.addOverlay(saludLayer, "Establecimientos de Salud");
+      })
+      .catch(e => console.error("Error al cargar Salud:", e));
+
+    // C. CARGA GEOTIFF (UHI)
+    let loadedGeoraster = null, rasterLayer = null;
+    fetch(urlTIFF)
+      .then(r => r.arrayBuffer())
+      .then(buffer => parseGeoraster(buffer))
+      .then(georaster => {
+        loadedGeoraster = georaster;
+        rasterLayer = new GeoRasterLayer({
+          georaster: georaster,
+          opacity: 0.7,
+          resolution: 256,
+          pixelValuesToColorFn: values => {
+            const val = values[0];
+            if (val === null || isNaN(val) || val === georaster.noDataValue) return null;
+            return getSpectralColor(val);
+          }
+        });
+        rasterLayer.addTo(map);
+        layerControl.addOverlay(rasterLayer, "Intensidad Isla de Calor (UHI)");
+        if (saludLayer) saludLayer.bringToFront();
+      })
+      .catch(e => console.error("Error al cargar GeoTIFF:", e));
+
+    // POPUP RASTER
+    map.on('click', function (e) {
+      if (!loadedGeoraster || !rasterLayer || !map.hasLayer(rasterLayer)) return;
+      const lat = e.latlng.lat, lng = e.latlng.lng;
+      const georaster = loadedGeoraster;
+      const x = Math.floor((lng - georaster.xmin) / georaster.pixelWidth);
+      const y = Math.floor((georaster.ymax - lat) / georaster.pixelHeight);
+
+      if (x >= 0 && x < georaster.width && y >= 0 && y < georaster.height) {
+        const val = georaster.values[0][y][x];
+        if (val !== null && !isNaN(val) && val !== georaster.noDataValue) {
+          L.popup()
+            .setLatLng(e.latlng)
+            .setContent(`
+              <div style="font-family: Arial; text-align: center;">
+                <div style="font-size: 10px; color: #718096; font-weight: bold;">ISLA DE CALOR</div>
+                <div style="font-size: 16px; font-weight: bold; color: #2b6cb0;">${val.toFixed(2)} °C</div>
+              </div>
+            `)
+            .openOn(map);
+        }
+      }
+    });
+
+    // LEYENDA
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function () {
+      const div = L.DomUtil.create('div', 'info legend');
+      div.innerHTML = `
+        <div class="main-title">Vulnerabilidad Socio-Ambiental e Isla de Calor Urbana</div>
+        <div class="author-tag">Desarrollado por Paula Segovia</div>
+        
+        <div class="legend-title">Intensidad Isla de Calor (UHI)</div>
+        <div class="continuous-bar"></div>
+        <div class="continuous-labels">
+          <span>${STATS.min.toFixed(1)}°C</span>
+          <span>0°C</span>
+          <span>+${STATS.max.toFixed(1)}°C</span>
+        </div>
+
+        <div class="legend-title">Materiales Precarios (INMAT IV)</div>
+        <div class="legend-scale">
+          <div><i style="background:#f3e5f5"></i> 0% &ndash; 1.5%</div>
+          <div><i style="background:#ce93d8"></i> 1.5% &ndash; 4.4%</div>
+          <div><i style="background:#ab47bc"></i> 4.4% &ndash; 11.5%</div>
+          <div><i style="background:#7b1fa2"></i> 11.5% &ndash; 33.3%</div>
+          <div><i style="background:#4a148c"></i> > 33.3%</div>
+        </div>
+
+        <div class="legend-source">Fuentes: Censo 2022 (INDEC) & REFES</div>
+      `;
+      return div;
+    };
+    legend.addTo(map);
+  </script>
+</body>
+</html>
